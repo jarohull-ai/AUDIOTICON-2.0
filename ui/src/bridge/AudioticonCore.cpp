@@ -63,6 +63,30 @@ ModelInfo toModelInfo(const ::audioticon::bridge::ModelInfoDto &dto)
     return info;
 }
 
+ModelPresetFile toPresetFile(const ::audioticon::bridge::PresetFileDto &dto)
+{
+    ModelPresetFile file;
+    file.role = toQString(dto.role);
+    file.fileName = toQString(dto.file_name);
+    file.url = toQString(dto.url);
+    file.sha256 = toQString(dto.sha256);
+    file.sizeBytes = static_cast<qint64>(dto.size_bytes);
+    return file;
+}
+
+ModelImportResult toImportResult(const ::audioticon::bridge::ImportResultDto &dto)
+{
+    ModelImportResult result;
+    result.importId = static_cast<quint64>(dto.import_id);
+    result.status = toQString(dto.status);
+    result.modelId = toQString(dto.model_id);
+    result.modelPath = toQString(dto.model_path);
+    result.modelStatus = toQString(dto.model_status);
+    result.message = toQString(dto.message);
+    result.source = toQString(dto.source);
+    return result;
+}
+
 } // namespace
 
 int coreSampleRate()
@@ -265,6 +289,218 @@ bool CoreSession::clearModelSelection(QString *errorOut)
             *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
     }
     return false;
+}
+
+// ---- M18: dodawanie modeli ------------------------------------------------
+
+QVector<ModelSourceInfo> CoreSession::listSources() const
+{
+    QVector<ModelSourceInfo> result;
+    if (!m_impl->engine)
+        return result;
+    try {
+        for (const auto &dto : ::audioticon::bridge::list_sources(**m_impl->engine)) {
+            ModelSourceInfo source;
+            source.kind = toQString(dto.kind);
+            source.name = toQString(dto.name);
+            source.detail = toQString(dto.detail);
+            source.network = dto.network;
+            source.requiresExplicitConsent = dto.requires_explicit_consent;
+            result.append(source);
+        }
+    } catch (const std::exception &error) {
+        qWarning("AudioticonCore: list_sources nie powiodło się: %s", error.what());
+    }
+    return result;
+}
+
+QVector<CuratedPreset> CoreSession::listCuratedPresets() const
+{
+    QVector<CuratedPreset> result;
+    if (!m_impl->engine)
+        return result;
+    try {
+        for (const auto &dto : ::audioticon::bridge::list_curated_presets(**m_impl->engine)) {
+            CuratedPreset preset;
+            preset.id = toQString(dto.id);
+            preset.kind = toQString(dto.kind);
+            preset.name = toQString(dto.name);
+            preset.author = toQString(dto.author);
+            preset.license = toQString(dto.license);
+            preset.language = toQString(dto.language);
+            preset.format = toQString(dto.format);
+            preset.sizeBytes = static_cast<qint64>(dto.size_bytes);
+            preset.source = toQString(dto.source);
+            preset.sourceReference = toQString(dto.source_reference);
+            preset.origin = toQString(dto.origin);
+            preset.description = toQString(dto.description);
+            preset.installed = dto.installed;
+            preset.installedStatus = toQString(dto.installed_status);
+            for (const auto &file : dto.files)
+                preset.files.append(toPresetFile(file));
+            result.append(preset);
+        }
+    } catch (const std::exception &error) {
+        qWarning("AudioticonCore: list_curated_presets nie powiodło się: %s", error.what());
+    }
+    return result;
+}
+
+std::optional<RemoteCandidate> CoreSession::inspectRemoteCandidate(const QString &reference,
+                                                                   QString *errorOut) const
+{
+    if (!m_impl->engine) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Silnik Rust nie został zainicjalizowany");
+        return std::nullopt;
+    }
+    try {
+        const auto dto = ::audioticon::bridge::inspect_remote_candidate(
+            **m_impl->engine, reference.toStdString());
+        RemoteCandidate candidate;
+        candidate.id = toQString(dto.id);
+        candidate.kind = toQString(dto.kind);
+        candidate.name = toQString(dto.name);
+        candidate.author = toQString(dto.author);
+        candidate.license = toQString(dto.license);
+        candidate.language = toQString(dto.language);
+        candidate.format = toQString(dto.format);
+        candidate.sizeBytes = static_cast<qint64>(dto.size_bytes);
+        candidate.source = toQString(dto.source);
+        candidate.sourceReference = toQString(dto.source_reference);
+        candidate.originUrl = toQString(dto.origin_url);
+        candidate.curated = dto.curated;
+        candidate.downloadable = dto.downloadable;
+        for (const auto &blocker : dto.blockers)
+            candidate.blockers.append(toQString(blocker));
+        for (const auto &file : dto.files)
+            candidate.files.append(toPresetFile(file));
+        return candidate;
+    } catch (const std::exception &error) {
+        if (errorOut)
+            *errorOut = QString::fromUtf8(error.what());
+    } catch (...) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
+    }
+    return std::nullopt;
+}
+
+std::optional<ModelImportResult> CoreSession::importLocal(const QString &path, const QString &kind,
+                                                          bool acceptUnknownLicense,
+                                                          QString *errorOut) const
+{
+    if (!m_impl->engine) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Silnik Rust nie został zainicjalizowany");
+        return std::nullopt;
+    }
+    try {
+        return toImportResult(::audioticon::bridge::import_local(
+            **m_impl->engine, path.toStdString(), kind.toStdString(), acceptUnknownLicense));
+    } catch (const std::exception &error) {
+        if (errorOut)
+            *errorOut = QString::fromUtf8(error.what());
+    } catch (...) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
+    }
+    return std::nullopt;
+}
+
+std::optional<ModelImportResult> CoreSession::downloadRemote(const QString &reference,
+                                                             const QString &expectedSha256,
+                                                             quint64 expectedSize, bool consent,
+                                                             QString *errorOut) const
+{
+    if (!m_impl->engine) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Silnik Rust nie został zainicjalizowany");
+        return std::nullopt;
+    }
+    try {
+        return toImportResult(::audioticon::bridge::download_remote(
+            **m_impl->engine, reference.toStdString(), expectedSha256.toStdString(),
+            static_cast<std::uint64_t>(expectedSize), consent));
+    } catch (const std::exception &error) {
+        if (errorOut)
+            *errorOut = QString::fromUtf8(error.what());
+    } catch (...) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
+    }
+    return std::nullopt;
+}
+
+bool CoreSession::cancelImport(quint64 importId)
+{
+    if (!m_impl->engine)
+        return false;
+    return ::audioticon::bridge::cancel_import(**m_impl->engine,
+                                               static_cast<std::uint64_t>(importId));
+}
+
+quint64 CoreSession::activeImportId() const
+{
+    if (!m_impl->engine)
+        return 0;
+    return static_cast<quint64>(::audioticon::bridge::active_import_id(**m_impl->engine));
+}
+
+std::optional<ModelVerifyResult> CoreSession::verifyModel(const QString &id,
+                                                          QString *errorOut) const
+{
+    if (!m_impl->engine) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Silnik Rust nie został zainicjalizowany");
+        return std::nullopt;
+    }
+    try {
+        const auto dto = ::audioticon::bridge::verify_model(**m_impl->engine, id.toStdString());
+        ModelVerifyResult result;
+        result.id = toQString(dto.id);
+        result.kind = toQString(dto.kind);
+        result.status = toQString(dto.status);
+        result.checked = dto.checked;
+        result.expectedSha256 = toQString(dto.expected_sha256);
+        result.actualSha256 = toQString(dto.actual_sha256);
+        result.matches = dto.matches;
+        result.sizeBytes = static_cast<qint64>(dto.size_bytes);
+        result.message = toQString(dto.message);
+        return result;
+    } catch (const std::exception &error) {
+        if (errorOut)
+            *errorOut = QString::fromUtf8(error.what());
+    } catch (...) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
+    }
+    return std::nullopt;
+}
+
+std::optional<ModelRemoveResult> CoreSession::removeModel(const QString &id, QString *errorOut)
+{
+    if (!m_impl->engine) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Silnik Rust nie został zainicjalizowany");
+        return std::nullopt;
+    }
+    try {
+        const auto dto = ::audioticon::bridge::remove_model(**m_impl->engine, id.toStdString());
+        ModelRemoveResult result;
+        result.id = toQString(dto.id);
+        result.kind = toQString(dto.kind);
+        result.removedFiles = static_cast<int>(dto.removed_files);
+        result.selectionCleared = dto.selection_cleared;
+        return result;
+    } catch (const std::exception &error) {
+        if (errorOut)
+            *errorOut = QString::fromUtf8(error.what());
+    } catch (...) {
+        if (errorOut)
+            *errorOut = QStringLiteral("Nieznany błąd rdzenia Rust");
+    }
+    return std::nullopt;
 }
 
 } // namespace audioticon::ui

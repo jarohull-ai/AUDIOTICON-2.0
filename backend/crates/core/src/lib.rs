@@ -11,6 +11,8 @@ pub mod kokoro;
 pub mod ledger;
 pub mod model_catalog;
 pub mod model_hub;
+pub mod model_import;
+pub mod model_sources;
 pub mod models;
 pub mod parser;
 pub mod pcm_stream;
@@ -73,8 +75,18 @@ pub use importer::{
 pub use kokoro::{KokoroBridge, KokoroVoice, KOKORO_SAMPLE_RATE};
 pub use ledger::{measure_audio_loudness, AudioCertificate};
 pub use model_catalog::{
-    CatalogError, CatalogModel, CatalogStatus, ModelAvailability, ModelCatalog, ModelFormat,
-    ModelKind, ModelSelection, MODELS_SUBDIR, SELECTION_FILE_NAME,
+    model_companion_files, CatalogError, CatalogModel, CatalogStatus, ModelAvailability,
+    ModelCatalog, ModelFormat, ModelKind, ModelSelection, StagingIntent, MODELS_SUBDIR,
+    SELECTION_FILE_NAME, STAGING_INTENT_FILE, STAGING_SUBDIR,
+};
+pub use model_import::{
+    ImportConsent, ImportError, ImportOutcome, ImportRegistry, ImportStatus, ModelImporter,
+    RemoteDownloadRequest, RemoteTransport, RemoveResult, TransportError, VerifyResult,
+};
+pub use model_sources::{
+    builtin_presets, describe_remote_reference, find_preset, is_allowed_download_url, list_sources,
+    CuratedPreset, ModelSourceInfo, ModelSourceKind, PresetFile, PresetFileRole, RemoteCandidate,
+    SourceError,
 };
 pub use model_hub::{
     authorize_model_access, check_hub_authorization, get_curated_hub_catalog, LicenseReceipt,

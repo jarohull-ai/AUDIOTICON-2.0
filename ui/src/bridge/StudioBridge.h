@@ -82,6 +82,20 @@ public:
     Q_INVOKABLE bool selectModel(const QString &id);
     Q_INVOKABLE bool clearModelSelection();
 
+    // Dodawanie modeli (M18): źródła, presety, import lokalny, pobranie na żądanie.
+    Q_INVOKABLE QVariantList modelSources() const;
+    Q_INVOKABLE QVariantList curatedPresets() const;
+    Q_INVOKABLE QVariantMap inspectRemoteCandidate(const QString &reference) const;
+    Q_INVOKABLE QVariantMap importLocalModel(const QString &path,
+                                             const QString &kind = QString(),
+                                             bool acceptUnknownLicense = false);
+    Q_INVOKABLE QVariantMap downloadRemoteModel(const QString &reference,
+                                                const QString &expectedSha256 = QString(),
+                                                quint64 expectedSize = 0, bool consent = false);
+    Q_INVOKABLE bool cancelImport(quint64 importId);
+    Q_INVOKABLE bool verifyModel(const QString &id);
+    Q_INVOKABLE bool removeModel(const QString &id);
+
     QString activeModelId() const;
     QString modelError() const { return m_modelError; }
 
@@ -108,6 +122,9 @@ signals:
 
     // Wybór modelu zmienił się (albo próba wyboru zwróciła błąd).
     void modelSelectionChanged();
+
+    // Zakończony import/pobranie: `completed`, `cancelled` albo `failed`.
+    void modelImportFinished(const QString &status);
 
 private slots:
     void pollJob();

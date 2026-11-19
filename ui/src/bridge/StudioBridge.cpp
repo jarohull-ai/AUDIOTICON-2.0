@@ -149,6 +149,213 @@ void StudioBridge::playSegment(int index)
     startRender(segText);
 }
 
+namespace {
+
+QVariantMap presetFileToVariant(const audioticon::ui::ModelPresetFile &file)
+{
+    return QVariantMap{
+        {QStringLiteral("role"), file.role},
+        {QStringLiteral("fileName"), file.fileName},
+        {QStringLiteral("url"), file.url},
+        {QStringLiteral("sha256"), file.sha256},
+        {QStringLiteral("sizeBytes"), file.sizeBytes},
+    };
+}
+
+QVariantList presetFilesToVariant(const QVector<audioticon::ui::ModelPresetFile> &files)
+{
+    QVariantList list;
+    list.reserve(files.size());
+    for (const auto &file : files)
+        list.append(presetFileToVariant(file));
+    return list;
+}
+
+} // namespace
+
+QVariantList StudioBridge::modelSources() const
+{
+    QVariantList list;
+    if (!m_session)
+        return list;
+    for (const auto &source : m_session->listSources()) {
+        list.append(QVariantMap{
+            {QStringLiteral("kind"), source.kind},
+            {QStringLiteral("name"), source.name},
+            {QStringLiteral("detail"), source.detail},
+            {QStringLiteral("network"), source.network},
+            {QStringLiteral("requiresExplicitConsent"), source.requiresExplicitConsent},
+        });
+    }
+    return list;
+}
+
+QVariantList StudioBridge::curatedPresets() const
+{
+    QVariantList list;
+    if (!m_session)
+        return list;
+    for (const auto &preset : m_session->listCuratedPresets()) {
+        list.append(QVariantMap{
+            {QStringLiteral("id"), preset.id},
+            {QStringLiteral("kind"), preset.kind},
+            {QStringLiteral("name"), preset.name},
+            {QStringLiteral("author"), preset.author},
+            {QStringLiteral("license"), preset.license},
+            {QStringLiteral("language"), preset.language},
+            {QStringLiteral("format"), preset.format},
+            {QStringLiteral("sizeBytes"), preset.sizeBytes},
+            {QStringLiteral("source"), preset.source},
+            {QStringLiteral("sourceReference"), preset.sourceReference},
+            {QStringLiteral("origin"), preset.origin},
+            {QStringLiteral("description"), preset.description},
+            {QStringLiteral("files"), presetFilesToVariant(preset.files)},
+            {QStringLiteral("installed"), preset.installed},
+            {QStringLiteral("installedStatus"), preset.installedStatus},
+        });
+    }
+    return list;
+}
+
+QVariantMap StudioBridge::inspectRemoteCandidate(const QString &reference) const
+{
+    if (!m_session)
+        return QVariantMap{};
+
+    QString error;
+    const std::optional<audioticon::ui::RemoteCandidate> candidate =
+        m_session->inspectRemoteCandidate(reference, &error);
+    if (!candidate)
+        return QVariantMap{{QStringLiteral("error"), error.isEmpty()
+                                                       ? QStringLiteral("Nie można odczytać źródła '%1'").arg(reference)
+                                                       : error}};
+
+    QVariantList blockers;
+    for (const auto &blocker : candidate->blockers)
+        blockers.append(blocker);
+
+    return QVariantMap{
+        {QStringLiteral("id"), candidate->id},
+        {QStringLiteral("kind"), candidate->kind},
+        {QStringLiteral("name"), candidate->name},
+        {QStringLiteral("author"), candidate->author},
+        {QStringLiteral("license"), candidate->license},
+        {QStringLiteral("language"), candidate->language},
+        {QStringLiteral("format"), candidate->format},
+        {QStringLiteral("sizeBytes"), candidate->sizeBytes},
+        {QStringLiteral("source"), candidate->source},
+        {QStringLiteral("sourceReference"), candidate->sourceReference},
+        {QStringLiteral("originUrl"), candidate->originUrl},
+        {QStringLiteral("curated"), candidate->curated},
+        {QStringLiteral("downloadable"), candidate->downloadable},
+        {QStringLiteral("blockers"), blockers},
+        {QStringLiteral("files"), presetFilesToVariant(candidate->files)},
+    };
+}
+
+QVariantMap StudioBridge::importLocalModel(const QString &path, const QString &kind,
+                                           bool acceptUnknownLicense)
+{
+    if (!m_session)
+        return QVariantMap{{QStringLiteral("error"), QStringLiteral("Silnik Rust nie został zainicjalizowany")}};
+
+    QString error;
+    const std::optional<audioticon::ui::ModelImportResult> result =
+        m_session->importLocal(path, kind, acceptUnknownLicense, &error);
+    if (!result) {
+        m_modelError = error.isEmpty()
+                           ? QStringLiteral("Nie można zaimportować modelu '%1'").arg(path)
+                           : error;
+        emit modelSelectionChanged();
+        emit modelImportFinished(QStringLiteral("failed"));
+        return QVariantMap{{QStringLiteral("status"), QStringLiteral("failed")},
+                           {QStringLiteral("error"), m_modelError}};
+    }
+
+    m_modelError.clear();
+    emit modelSelectionChanged();
+    emit modelImportFinished(result->status);
+    return QVariantMap{
+        {QStringLiteral("status"), result->status},
+        {QStringLiteral("modelId"), result->modelId},
+        {QStringLiteral("modelPath"), result->modelPath},
+        {QStringLiteral("modelStatus"), result->modelStatus},
+        {QStringLiteral("message"), result->message},
+        {QStringLiteral("source"), result->source},
+    };
+}
+
+QVariantMap StudioBridge::downloadRemoteModel(const QString &reference,
+                                              const QString &expectedSha256,
+                                              quint64 expectedSize, bool consent)
+{
+    if (!m_session)
+        return QVariantMap{{QStringLiteral("error"), QStringLiteral("Silnik Rust nie został zainicjalizowany")}};
+
+    QString error;
+    const std::optional<audioticon::ui::ModelImportResult> result =
+        m_session->downloadRemote(reference, expectedSha256, expectedSize, consent, &error);
+    if (!result) {
+        m_modelError = error.isEmpty()
+                           ? QStringLiteral("Nie można pobrać '%1'").arg(reference)
+                           : error;
+        emit modelSelectionChanged();
+        emit modelImportFinished(QStringLiteral("failed"));
+        return QVariantMap{{QStringLiteral("status"), QStringLiteral("failed")},
+                           {QStringLiteral("error"), m_modelError}};
+    }
+
+    m_modelError.clear();
+    emit modelSelectionChanged();
+    emit modelImportFinished(result->status);
+    return QVariantMap{
+        {QStringLiteral("status"), result->status},
+        {QStringLiteral("modelId"), result->modelId},
+        {QStringLiteral("modelPath"), result->modelPath},
+        {QStringLiteral("modelStatus"), result->modelStatus},
+        {QStringLiteral("message"), result->message},
+        {QStringLiteral("source"), result->source},
+    };
+}
+
+bool StudioBridge::cancelImport(quint64 importId)
+{
+    return m_session && m_session->cancelImport(importId);
+}
+
+bool StudioBridge::verifyModel(const QString &id)
+{
+    if (!m_session)
+        return false;
+    QString error;
+    const auto result = m_session->verifyModel(id, &error);
+    if (!result) {
+        m_modelError = error;
+        emit modelSelectionChanged();
+        return false;
+    }
+    m_modelError = result->checked && !result->matches ? result->message : QString();
+    emit modelSelectionChanged();
+    return result->checked ? result->matches : true;
+}
+
+bool StudioBridge::removeModel(const QString &id)
+{
+    if (!m_session)
+        return false;
+    QString error;
+    const auto result = m_session->removeModel(id, &error);
+    if (!result) {
+        m_modelError = error.isEmpty() ? QStringLiteral("Nie można usunąć modelu '%1'").arg(id)
+                                       : error;
+        emit modelSelectionChanged();
+        return false;
+    }
+    m_modelError.clear();
+    emit modelSelectionChanged();
+    return true;
+}
+
 QVariantList StudioBridge::models() const
 {
     QVariantList list;

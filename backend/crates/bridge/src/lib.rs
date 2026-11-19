@@ -105,6 +105,8 @@ pub mod ffi {
         total: u32,
         available: u32,
         unavailable: u32,
+        /// Models whose import/download is still in progress (or was interrupted).
+        incomplete: u32,
         /// Persisted selection, if any (may point at a model that vanished).
         active_id: String,
         active_kind: String,
@@ -114,6 +116,106 @@ pub mod ffi {
         /// Piper model actually wired into rendering, if any.
         piper_model_path: String,
         message: String,
+    }
+
+    /// Jeden plik presetu lub kandydata zdalnego.
+    #[derive(Clone, Debug, PartialEq)]
+    struct PresetFileDto {
+        role: String,
+        file_name: String,
+        url: String,
+        sha256: String,
+        size_bytes: u64,
+    }
+
+    /// Jeden z czterech sposobów dodawania modeli.
+    #[derive(Clone, Debug, PartialEq)]
+    struct ModelSourceDto {
+        kind: String,
+        name: String,
+        detail: String,
+        network: bool,
+        requires_explicit_consent: bool,
+    }
+
+    /// Preset kurowany (Modele znane z Portable Local Studio), bez pobierania.
+    #[derive(Clone, Debug, PartialEq)]
+    struct CuratedPresetDto {
+        id: String,
+        kind: String,
+        name: String,
+        author: String,
+        license: String,
+        language: String,
+        format: String,
+        size_bytes: u64,
+        source: String,
+        source_reference: String,
+        origin: String,
+        description: String,
+        files: Vec<PresetFileDto>,
+        /// Czy model jest już w katalogu.
+        installed: bool,
+        /// Status katalogu albo `not_installed`.
+        installed_status: String,
+    }
+
+    /// To, co UI pokazuje **przed** pobraniem: źródło, autor, licencja,
+    /// rozmiar, format i ewentualne braki metadanych.
+    #[derive(Clone, Debug, PartialEq)]
+    struct RemoteCandidateDto {
+        id: String,
+        kind: String,
+        name: String,
+        author: String,
+        license: String,
+        language: String,
+        format: String,
+        size_bytes: u64,
+        source: String,
+        source_reference: String,
+        origin_url: String,
+        curated: bool,
+        downloadable: bool,
+        blockers: Vec<String>,
+        files: Vec<PresetFileDto>,
+    }
+
+    /// Wynik importu lub pobrania.
+    #[derive(Clone, Debug, PartialEq)]
+    struct ImportResultDto {
+        import_id: u64,
+        /// `completed`, `cancelled` albo `failed`.
+        status: String,
+        model_id: String,
+        model_path: String,
+        model_status: String,
+        message: String,
+        source: String,
+    }
+
+    /// Wynik jawnej weryfikacji checksumu.
+    #[derive(Clone, Debug, PartialEq)]
+    struct VerifyResultDto {
+        id: String,
+        kind: String,
+        status: String,
+        checked: bool,
+        expected_sha256: String,
+        actual_sha256: String,
+        /// Ma sens tylko gdy `checked`.
+        matches: bool,
+        size_bytes: u64,
+        message: String,
+    }
+
+    /// Wynik usunięcia modelu.
+    #[derive(Clone, Debug, PartialEq)]
+    struct RemoveResultDto {
+        id: String,
+        kind: String,
+        removed_files: u32,
+        selection_cleared: bool,
     }
 
     /// Snapshot of one render job, pulled by the Qt side with `job_state`.
@@ -199,6 +301,41 @@ pub mod ffi {
         fn model_status(engine: &BridgeEngine) -> ModelStatusDto;
 
         fn clear_model_selection(engine: &BridgeEngine) -> Result<()>;
+
+        // ---- M18: dodawanie modeli (presety / lokalny / zdalny) -------------
+        // Pobranie jest jedyną funkcją, która może otworzyć sieć — i tylko z
+        // jawną zgodą oraz wstrzykniętym transportem.
+        fn list_sources(engine: &BridgeEngine) -> Vec<ModelSourceDto>;
+
+        fn list_curated_presets(engine: &BridgeEngine) -> Vec<CuratedPresetDto>;
+
+        fn inspect_remote_candidate(
+            engine: &BridgeEngine,
+            reference: &str,
+        ) -> Result<RemoteCandidateDto>;
+
+        fn import_local(
+            engine: &BridgeEngine,
+            path: &str,
+            kind: &str,
+            accept_unknown_license: bool,
+        ) -> Result<ImportResultDto>;
+
+        fn download_remote(
+            engine: &BridgeEngine,
+            reference: &str,
+            expected_sha256: &str,
+            expected_size: u64,
+            consent: bool,
+        ) -> Result<ImportResultDto>;
+
+        fn cancel_import(engine: &BridgeEngine, import_id: u64) -> bool;
+
+        fn active_import_id(engine: &BridgeEngine) -> u64;
+
+        fn verify_model(engine: &BridgeEngine, id: &str) -> Result<VerifyResultDto>;
+
+        fn remove_model(engine: &BridgeEngine, id: &str) -> Result<RemoveResultDto>;
     }
 }
 
@@ -217,6 +354,8 @@ pub enum BridgeError {
     InvalidRequest(String),
     #[error("Model niedostępny: {0}")]
     ModelUnavailable(String),
+    #[error("Import modelu nie powiódł się: {0}")]
+    ModelImport(String),
 }
 
 // ============================================================================
@@ -755,6 +894,8 @@ pub struct BridgeEngine {
     piper: Mutex<Option<Arc<audioticon_core::PiperBridge>>>,
     /// M17: the one local model catalog used by every model-related call.
     catalog: audioticon_core::ModelCatalog,
+    /// M18: import lokalny, pobrania na żądanie, weryfikacja i usuwanie.
+    importer: audioticon_core::ModelImporter,
     /// Shared with the runtime tasks, so a job outlives the Qt-side engine.
     jobs: Arc<JobRegistry>,
     mock_enabled: bool,
@@ -776,7 +917,11 @@ impl BridgeEngine {
     }
 
     pub fn new_with_mock(allow_mock: bool) -> Self {
-        Self::from_catalog(audioticon_core::ModelCatalog::for_current_user(), allow_mock)
+        Self::from_catalog(
+            audioticon_core::ModelCatalog::for_current_user(),
+            allow_mock,
+            None,
+        )
     }
 
     /// Builds an engine over an explicit catalog root (tests, portable bundle).
@@ -784,12 +929,37 @@ impl BridgeEngine {
     /// The legacy flat-model fallback stays off: an explicit root means an
     /// explicit model tree, nothing else on the machine.
     pub fn new_with_catalog(root: PathBuf, allow_mock: bool) -> Self {
-        Self::from_catalog(audioticon_core::ModelCatalog::new(root), allow_mock)
+        Self::from_catalog(audioticon_core::ModelCatalog::new(root), allow_mock, None)
     }
 
-    fn from_catalog(catalog: audioticon_core::ModelCatalog, allow_mock: bool) -> Self {
+    /// Builds an engine with an explicit transport for downloads (tests, and a
+    /// future HTTPS client). `None` keeps the engine fully offline.
+    pub fn new_with_catalog_and_transport(
+        root: PathBuf,
+        allow_mock: bool,
+        transport: Arc<dyn audioticon_core::RemoteTransport>,
+    ) -> Self {
+        Self::from_catalog(
+            audioticon_core::ModelCatalog::new(root),
+            allow_mock,
+            Some(transport),
+        )
+    }
+
+    fn from_catalog(
+        catalog: audioticon_core::ModelCatalog,
+        allow_mock: bool,
+        transport: Option<Arc<dyn audioticon_core::RemoteTransport>>,
+    ) -> Self {
         let piper = resolve_piper_model_in(&catalog)
             .map(|m| Arc::new(audioticon_core::PiperBridge::new(m)));
+        let importer = match transport {
+            Some(transport) => audioticon_core::ModelImporter::with_transport(
+                catalog.clone(),
+                transport,
+            ),
+            None => audioticon_core::ModelImporter::new(catalog.clone()),
+        };
         let mock_enabled = allow_mock
             || std::env::var("AUDIOTICON_MOCK_RENDER")
                 .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
@@ -798,6 +968,7 @@ impl BridgeEngine {
             director: audioticon_core::parser::EmojiDirector::default(),
             piper: Mutex::new(piper),
             catalog,
+            importer,
             jobs: Arc::new(JobRegistry::default()),
             mock_enabled,
         }
@@ -1231,6 +1402,7 @@ impl BridgeEngine {
             total: status.total,
             available: status.available,
             unavailable: status.unavailable,
+            incomplete: status.incomplete,
             active_id: selected.as_ref().map(|s| s.id.clone()).unwrap_or_default(),
             active_kind: selected
                 .as_ref()
@@ -1268,6 +1440,283 @@ pub fn model_status(engine: &BridgeEngine) -> ModelStatusDto {
 
 pub fn clear_model_selection(engine: &BridgeEngine) -> Result<(), BridgeError> {
     engine.clear_model_selection()
+}
+
+// ---- M18: sources, import, download, verify, remove -----------------------
+
+fn preset_file_dto(file: &audioticon_core::PresetFile) -> PresetFileDto {
+    PresetFileDto {
+        role: file.role.as_str().to_string(),
+        file_name: file.file_name.clone(),
+        url: file.url.clone(),
+        sha256: file.sha256.clone().unwrap_or_default(),
+        size_bytes: file.size_bytes,
+    }
+}
+
+fn remote_candidate_dto(candidate: audioticon_core::RemoteCandidate) -> RemoteCandidateDto {
+    RemoteCandidateDto {
+        id: candidate.id,
+        kind: candidate.kind.as_str().to_string(),
+        name: candidate.name,
+        author: candidate.author,
+        license: candidate.license,
+        language: candidate.language.unwrap_or_default(),
+        format: candidate.format.as_str().to_string(),
+        size_bytes: candidate.size_bytes,
+        source: candidate.source.as_str().to_string(),
+        source_reference: candidate.source_reference,
+        origin_url: candidate.origin_url,
+        curated: candidate.curated,
+        downloadable: candidate.downloadable,
+        blockers: candidate.blockers,
+        files: candidate.files.iter().map(preset_file_dto).collect(),
+    }
+}
+
+fn import_result_dto(
+    import_id: u64,
+    status: &str,
+    model: Option<&audioticon_core::CatalogModel>,
+    message: String,
+    source: String,
+) -> ImportResultDto {
+    ImportResultDto {
+        import_id,
+        status: status.to_string(),
+        model_id: model.map(|m| m.id.clone()).unwrap_or_default(),
+        model_path: model
+            .map(|m| m.path.display().to_string())
+            .unwrap_or_default(),
+        model_status: model
+            .map(|m| m.status.as_str().to_string())
+            .unwrap_or_else(|| "unavailable".to_string()),
+        message,
+        source,
+    }
+}
+
+impl BridgeEngine {
+    /// The four ways of adding a model (curated / local / GitHub / Hugging Face).
+    pub fn list_sources(&self) -> Vec<ModelSourceDto> {
+        audioticon_core::list_sources()
+            .into_iter()
+            .map(|source| ModelSourceDto {
+                kind: source.kind.as_str().to_string(),
+                name: source.name,
+                detail: source.detail,
+                network: source.network,
+                requires_explicit_consent: source.requires_explicit_consent,
+            })
+            .collect()
+    }
+
+    /// Curated presets with their on-disk state. Pure listing: no network, no
+    /// downloads, no filesystem writes.
+    pub fn list_curated_presets(&self) -> Vec<CuratedPresetDto> {
+        audioticon_core::builtin_presets()
+            .into_iter()
+            .map(|preset| {
+                let installed = self.catalog.inspect(&preset.id);
+                CuratedPresetDto {
+                    id: preset.id,
+                    kind: preset.kind.as_str().to_string(),
+                    name: preset.name,
+                    author: preset.author,
+                    license: preset.license,
+                    language: preset.language.unwrap_or_default(),
+                    format: preset.format.as_str().to_string(),
+                    size_bytes: preset.size_bytes,
+                    source: preset.source.as_str().to_string(),
+                    source_reference: preset.source_reference,
+                    origin: preset.origin,
+                    description: preset.description,
+                    files: preset.files.iter().map(preset_file_dto).collect(),
+                    installed: installed.is_some(),
+                    installed_status: installed
+                        .map(|m| m.status.as_str().to_string())
+                        .unwrap_or_else(|| "not_installed".to_string()),
+                }
+            })
+            .collect()
+    }
+
+    /// Everything the UI must show before a download. No transfer happens here.
+    pub fn inspect_remote_candidate(
+        &self,
+        reference: &str,
+    ) -> Result<RemoteCandidateDto, BridgeError> {
+        audioticon_core::describe_remote_reference(reference)
+            .map(remote_candidate_dto)
+            .map_err(|err| BridgeError::ModelImport(err.to_string()))
+    }
+
+    /// Imports a local file/directory/ZIP. Unknown or unsafe formats are
+    /// rejected before anything lands in the catalog.
+    pub fn import_local_model(
+        &self,
+        path: &str,
+        kind: &str,
+        accept_unknown_license: bool,
+    ) -> Result<ImportResultDto, BridgeError> {
+        let parsed_kind = if kind.trim().is_empty() {
+            None
+        } else {
+            Some(audioticon_core::ModelKind::parse(kind).ok_or_else(|| {
+                BridgeError::InvalidRequest(format!("nieznany rodzaj modelu: '{kind}'"))
+            })?)
+        };
+        let model = self
+            .importer
+            .import_local(std::path::Path::new(path), parsed_kind, accept_unknown_license)
+            .map_err(|err| BridgeError::ModelImport(err.to_string()))?;
+        if model.kind == audioticon_core::ModelKind::PiperTts {
+            self.refresh_piper_engine();
+        }
+        Ok(import_result_dto(
+            0,
+            "completed",
+            Some(&model),
+            format!("zaimportowano {} ({})", model.id, model.path.display()),
+            format!("local:{path}"),
+        ))
+    }
+
+    /// Downloads only on an explicit request: `consent` must be true and the
+    /// engine must have a transport. No transport = plain error, no transfer.
+    pub fn download_remote_model(
+        &self,
+        reference: &str,
+        expected_sha256: &str,
+        expected_size: u64,
+        consent: bool,
+    ) -> Result<ImportResultDto, BridgeError> {
+        let mut request = audioticon_core::RemoteDownloadRequest::new(reference);
+        request.consent = if consent {
+            audioticon_core::ImportConsent::Explicit
+        } else {
+            audioticon_core::ImportConsent::NotGiven
+        };
+        request.expected_size = expected_size;
+        let sha = expected_sha256.trim();
+        request.expected_sha256 = (!sha.is_empty()).then(|| sha.to_string());
+
+        let outcome = self
+            .importer
+            .download(&request)
+            .map_err(|err| BridgeError::ModelImport(err.to_string()))?;
+        if let Some(model) = &outcome.model {
+            if model.kind == audioticon_core::ModelKind::PiperTts {
+                self.refresh_piper_engine();
+            }
+        }
+        Ok(import_result_dto(
+            outcome.import_id,
+            outcome.status.as_str(),
+            outcome.model.as_ref(),
+            outcome.message,
+            outcome.source,
+        ))
+    }
+
+    /// Cancels a running import. `false` when the id already finished.
+    pub fn cancel_import(&self, import_id: u64) -> bool {
+        self.importer.cancel(import_id)
+    }
+
+    /// Handle for `cancel_import` from another thread (0 = nothing running).
+    pub fn active_import_id(&self) -> u64 {
+        self.importer.active_import_id()
+    }
+
+    /// Explicit checksum verification of an installed model.
+    pub fn verify_model(&self, id: &str) -> Result<VerifyResultDto, BridgeError> {
+        let result = self
+            .importer
+            .verify(id)
+            .map_err(|err| BridgeError::ModelImport(err.to_string()))?;
+        Ok(VerifyResultDto {
+            id: result.id,
+            kind: result.kind.as_str().to_string(),
+            status: result.status.as_str().to_string(),
+            checked: result.checked,
+            expected_sha256: result.expected_sha256.unwrap_or_default(),
+            actual_sha256: result.actual_sha256.unwrap_or_default(),
+            matches: result.matches.unwrap_or(true),
+            size_bytes: result.size_bytes,
+            message: result.message,
+        })
+    }
+
+    /// Removes a model (weights, config, checksum) and clears its selection.
+    pub fn remove_model(&self, id: &str) -> Result<RemoveResultDto, BridgeError> {
+        let result = self
+            .importer
+            .remove(id)
+            .map_err(|err| BridgeError::ModelImport(err.to_string()))?;
+        self.refresh_piper_engine();
+        Ok(RemoveResultDto {
+            id: result.id,
+            kind: result.kind.as_str().to_string(),
+            removed_files: result.removed_files.len() as u32,
+            selection_cleared: result.selection_cleared,
+        })
+    }
+
+    fn refresh_piper_engine(&self) {
+        *self.piper_guard() = resolve_piper_model_in(&self.catalog)
+            .map(|path| Arc::new(audioticon_core::PiperBridge::new(path)));
+    }
+}
+
+pub fn list_sources(engine: &BridgeEngine) -> Vec<ModelSourceDto> {
+    engine.list_sources()
+}
+
+pub fn list_curated_presets(engine: &BridgeEngine) -> Vec<CuratedPresetDto> {
+    engine.list_curated_presets()
+}
+
+pub fn inspect_remote_candidate(
+    engine: &BridgeEngine,
+    reference: &str,
+) -> Result<RemoteCandidateDto, BridgeError> {
+    engine.inspect_remote_candidate(reference)
+}
+
+pub fn import_local(
+    engine: &BridgeEngine,
+    path: &str,
+    kind: &str,
+    accept_unknown_license: bool,
+) -> Result<ImportResultDto, BridgeError> {
+    engine.import_local_model(path, kind, accept_unknown_license)
+}
+
+pub fn download_remote(
+    engine: &BridgeEngine,
+    reference: &str,
+    expected_sha256: &str,
+    expected_size: u64,
+    consent: bool,
+) -> Result<ImportResultDto, BridgeError> {
+    engine.download_remote_model(reference, expected_sha256, expected_size, consent)
+}
+
+pub fn cancel_import(engine: &BridgeEngine, import_id: u64) -> bool {
+    engine.cancel_import(import_id)
+}
+
+pub fn active_import_id(engine: &BridgeEngine) -> u64 {
+    engine.active_import_id()
+}
+
+pub fn verify_model(engine: &BridgeEngine, id: &str) -> Result<VerifyResultDto, BridgeError> {
+    engine.verify_model(id)
+}
+
+pub fn remove_model(engine: &BridgeEngine, id: &str) -> Result<RemoveResultDto, BridgeError> {
+    engine.remove_model(id)
 }
 
 // ============================================================================
@@ -1826,6 +2275,224 @@ mod tests {
         // Nowy silnik nie podpina znikniętego modelu.
         let reopened = BridgeEngine::new_with_catalog(root.clone(), false);
         assert!(!reopened.has_piper_model());
+
+        cleanup_catalog(&root);
+    }
+
+    // ---- M18: sources, local import, download, verify, remove -------------
+
+    struct FakeTransport {
+        data: Vec<(String, Vec<u8>)>,
+    }
+
+    impl audioticon_core::RemoteTransport for FakeTransport {
+        fn fetch(
+            &self,
+            url: &str,
+            sink: &mut dyn FnMut(&[u8]) -> Result<(), audioticon_core::TransportError>,
+        ) -> Result<(), audioticon_core::TransportError> {
+            match self.data.iter().find(|(key, _)| key == url) {
+                Some((_, bytes)) => sink(bytes),
+                None => Err(audioticon_core::TransportError::HttpStatus(404)),
+            }
+        }
+    }
+
+    fn piper_source_dir(root: &std::path::Path, stem: &str) -> PathBuf {
+        let dir = root.join(format!("src-{stem}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(format!("{stem}.onnx")), vec![0x08u8; 4096]).unwrap();
+        std::fs::write(
+            dir.join(format!("{stem}.onnx.json")),
+            r#"{"language":{"code":"pl_PL"},"license":"CC0-1.0"}"#,
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_m18_sources_and_presets_are_offline() {
+        let root = catalog_test_dir("m18-sources");
+        let engine = BridgeEngine::new_with_catalog(root.clone(), false);
+
+        let sources = engine.list_sources();
+        assert_eq!(sources.len(), 4);
+        assert_eq!(sources[0].kind, "curated");
+        assert!(sources[0].requires_explicit_consent);
+        assert!(!sources[0].network);
+        assert!(sources.iter().any(|s| s.kind == "local" && !s.network));
+        assert!(sources
+            .iter()
+            .any(|s| s.kind == "github_release" && s.network));
+        assert!(sources
+            .iter()
+            .any(|s| s.kind == "hugging_face" && s.network));
+
+        let presets = engine.list_curated_presets();
+        assert!(presets.len() >= 8);
+        let darkman = presets
+            .iter()
+            .find(|p| p.id == "piper/pl_PL-darkman-medium")
+            .expect("preset Portable Local Studio");
+        assert_eq!(darkman.origin, "Portable Local Studio");
+        assert_eq!(darkman.format, "onnx");
+        assert!(!darkman.author.is_empty());
+        assert!(!darkman.license.is_empty());
+        assert!(darkman.size_bytes > 0);
+        assert!(!darkman.installed);
+        assert_eq!(darkman.installed_status, "not_installed");
+
+        // Listowanie presetów niczego nie instaluje i nie tworzy stagingu.
+        assert!(engine.list_models().is_empty());
+        assert!(!root.join(".staging").exists());
+
+        // Podgląd kandydata zdalnego pokazuje metadane przed pobraniem.
+        let candidate = engine
+            .inspect_remote_candidate("preset:piper/pl_PL-darkman-medium")
+            .unwrap();
+        assert!(candidate.curated);
+        assert!(candidate.downloadable);
+        assert!(!candidate.author.is_empty());
+        assert!(!candidate.license.is_empty());
+        assert!(candidate.size_bytes > 0);
+        assert_eq!(candidate.files.len(), 2);
+
+        cleanup_catalog(&root);
+    }
+
+    #[test]
+    fn test_m18_local_import_is_validated_persisted_and_removable() {
+        let root = catalog_test_dir("m18-local");
+        let engine = BridgeEngine::new_with_catalog(root.clone(), false);
+        let source = piper_source_dir(&root, "pl_PL-gosia-medium");
+
+        let imported = engine
+            .import_local_model(source.to_str().unwrap(), "", false)
+            .expect("import lokalny");
+        assert_eq!(imported.status, "completed");
+        assert_eq!(imported.model_id, "piper/pl_PL-gosia-medium");
+        assert_eq!(imported.model_status, "available");
+        assert!(imported.source.starts_with("local:"));
+
+        // Zły format: odrzucony, katalog bez zmian.
+        let bad = root.join("bad.txt");
+        std::fs::write(&bad, b"not a model").unwrap();
+        let error = engine
+            .import_local_model(bad.to_str().unwrap(), "", false)
+            .unwrap_err();
+        assert!(error.to_string().contains("format"), "{error}");
+        assert_eq!(engine.list_models().len(), 1);
+
+        // Nowy silnik (restart) widzi model.
+        let reopened = BridgeEngine::new_with_catalog(root.clone(), false);
+        assert_eq!(reopened.list_models().len(), 1);
+        assert!(reopened.has_piper_model());
+
+        let verified = reopened.verify_model("piper/pl_PL-gosia-medium").unwrap();
+        assert_eq!(verified.status, "available");
+        assert!(!verified.checked, "brak sidecara w imporcie lokalnym");
+        assert!(!verified.actual_sha256.is_empty());
+
+        reopened.select_model("piper/pl_PL-gosia-medium").unwrap();
+        let removed = reopened.remove_model("piper/pl_PL-gosia-medium").unwrap();
+        assert!(removed.selection_cleared);
+        assert!(removed.removed_files >= 2);
+        assert!(reopened.list_models().is_empty());
+        assert!(reopened.model_status().active_id.is_empty());
+        assert!(!reopened.has_piper_model());
+
+        cleanup_catalog(&root);
+    }
+
+    #[test]
+    fn test_m18_remote_download_needs_consent_and_network() {
+        let root = catalog_test_dir("m18-consent");
+        let engine = BridgeEngine::new_with_catalog(root.clone(), false);
+
+        // Bez zgody: brak transferu i jawny błąd.
+        let denied = engine
+            .download_remote_model("preset:piper/pl_PL-darkman-medium", "", 0, false)
+            .unwrap_err();
+        assert!(denied.to_string().contains("zgody"), "{denied}");
+
+        // Zgodna, ale bez transportu: brak sieci, zero plików.
+        let offline = engine
+            .download_remote_model("preset:piper/pl_PL-darkman-medium", "", 0, true)
+            .unwrap_err();
+        assert!(offline.to_string().contains("sieci"), "{offline}");
+        assert!(engine.list_models().is_empty());
+        assert!(!root.join(".staging").exists());
+
+        // Źródło spoza presetów wymaga checksumu i rozmiaru.
+        let unverified = engine
+            .download_remote_model("hf:owner/repo@main#model.gguf", "", 0, true)
+            .unwrap_err();
+        assert!(unverified.to_string().contains("SHA-256"), "{unverified}");
+
+        assert_eq!(engine.active_import_id(), 0);
+        assert!(!engine.cancel_import(999));
+
+        cleanup_catalog(&root);
+    }
+
+    #[test]
+    fn test_m18_download_with_transport_installs_and_verifies() {
+        let root = catalog_test_dir("m18-download");
+        let preset = audioticon_core::builtin_presets()
+            .into_iter()
+            .find(|p| p.id == "piper/pl_PL-darkman-medium")
+            .unwrap();
+        let weights = preset.weights_file().unwrap().url.clone();
+        let config = format!("{weights}.json");
+        let transport = Arc::new(FakeTransport {
+            data: vec![
+                (weights.clone(), vec![0x08u8; 4096]),
+                (
+                    config.clone(),
+                    br#"{"language":{"code":"pl_PL"},"license":"CC0-1.0"}"#.to_vec(),
+                ),
+            ],
+        });
+        let engine = BridgeEngine::new_with_catalog_and_transport(root.clone(), false, transport);
+
+        let result = engine
+            .download_remote_model("preset:piper/pl_PL-darkman-medium", "", 0, true)
+            .expect("pobranie z transportem testowym");
+        assert_eq!(result.status, "completed");
+        assert_eq!(result.model_id, "piper/pl_PL-darkman-medium");
+        assert_eq!(result.model_status, "available");
+
+        let models = engine.list_models();
+        assert_eq!(models.len(), 1);
+        assert!(!models[0].checksum_sha256.is_empty());
+        assert!(engine.has_piper_model());
+
+        let verified = engine.verify_model("piper/pl_PL-darkman-medium").unwrap();
+        assert!(verified.checked);
+        assert!(verified.matches);
+
+        // Checksum mismatch po pobraniu: nic nie zostaje w katalogu.
+        let other = "piper/pl_PL-gosia-medium";
+        let other_preset = audioticon_core::builtin_presets()
+            .into_iter()
+            .find(|p| p.id == other)
+            .unwrap();
+        let other_weights = other_preset.weights_file().unwrap().url.clone();
+        let transport2 = Arc::new(FakeTransport {
+            data: vec![
+                (other_weights.clone(), vec![0x08u8; 4096]),
+                (
+                    format!("{other_weights}.json"),
+                    br#"{"license":"CC0-1.0"}"#.to_vec(),
+                ),
+            ],
+        });
+        let engine2 = BridgeEngine::new_with_catalog_and_transport(root.clone(), false, transport2);
+        let mismatch = engine2
+            .download_remote_model(other, &"0".repeat(64), 0, true)
+            .unwrap_err();
+        assert!(mismatch.to_string().contains("checksum"), "{mismatch}");
+        assert!(engine2.inspect_model(other).is_err());
 
         cleanup_catalog(&root);
     }

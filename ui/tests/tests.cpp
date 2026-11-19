@@ -1391,6 +1391,169 @@ private slots:
             QVERIFY(!QFile::exists(appDir + QStringLiteral("/model_selection.json")));
         }
     }
+
+    // M18: źródła, presety bez pobierania, import lokalny i odrzucenia.
+    void modelImportContract()
+    {
+        ScopedEnv xdgGuard("XDG_DATA_HOME");
+        ScopedEnv mockGuard("AUDIOTICON_MOCK_RENDER");
+
+        QTemporaryDir dataHome;
+        QVERIFY(dataHome.isValid());
+        qputenv("XDG_DATA_HOME", dataHome.path().toUtf8());
+        qunsetenv("AUDIOTICON_MOCK_RENDER");
+
+        const QString modelsDir = dataHome.path() + QStringLiteral("/audioticon/models");
+        QString error;
+
+        // 1. Cztery źródła i presety: listowanie nic nie pobiera.
+        {
+            audioticon::ui::CoreSession session;
+            const QVector<audioticon::ui::ModelSourceInfo> sources = session.listSources();
+            QCOMPARE(sources.size(), 4);
+            QCOMPARE(sources.first().kind, QStringLiteral("curated"));
+            QVERIFY(sources.first().requiresExplicitConsent);
+            QVERIFY(!sources.first().network);
+
+            const QVector<audioticon::ui::CuratedPreset> presets = session.listCuratedPresets();
+            QVERIFY(presets.size() >= 8);
+            bool sawDarkman = false;
+            for (const auto &preset : presets) {
+                if (preset.id != QStringLiteral("piper/pl_PL-darkman-medium"))
+                    continue;
+                sawDarkman = true;
+                QCOMPARE(preset.kind, QStringLiteral("piper_tts"));
+                QCOMPARE(preset.format, QStringLiteral("onnx"));
+                QCOMPARE(preset.origin, QStringLiteral("Portable Local Studio"));
+                QVERIFY(!preset.author.isEmpty());
+                QVERIFY(!preset.license.isEmpty());
+                QVERIFY(preset.sizeBytes > 0);
+                QVERIFY(!preset.files.isEmpty());
+                QVERIFY(!preset.installed);
+                QCOMPARE(preset.installedStatus, QStringLiteral("not_installed"));
+            }
+            QVERIFY2(sawDarkman, "brak presetu Portable Local Studio");
+
+            QVERIFY(session.listModels().isEmpty());
+            QVERIFY(!QDir(modelsDir + QStringLiteral("/.staging")).exists());
+
+            // 2. Podgląd przed pobraniem: źródło, autor, licencja, rozmiar, format.
+            const std::optional<audioticon::ui::RemoteCandidate> candidate =
+                session.inspectRemoteCandidate("preset:piper/pl_PL-darkman-medium", &error);
+            QVERIFY2(candidate.has_value(), qPrintable(error));
+            QVERIFY(candidate->curated);
+            QVERIFY(candidate->downloadable);
+            QCOMPARE(candidate->format, QStringLiteral("onnx"));
+            QVERIFY(!candidate->author.isEmpty());
+            QVERIFY(!candidate->license.isEmpty());
+            QVERIFY(candidate->sizeBytes > 0);
+            QCOMPARE(candidate->files.size(), 2);
+            QVERIFY(!session.inspectRemoteCandidate("hf:../../evil.gguf", &error).has_value());
+
+            // 3. Pobranie wymaga jawnej zgody; potem jawny brak sieci.
+            QVERIFY(!session
+                         .downloadRemote("preset:piper/pl_PL-darkman-medium", QString(), 0, false,
+                                         &error)
+                         .has_value());
+            QVERIFY2(error.contains(QStringLiteral("zgody")), qPrintable(error));
+
+            error.clear();
+            QVERIFY(!session
+                         .downloadRemote("preset:piper/pl_PL-darkman-medium", QString(), 0, true,
+                                         &error)
+                         .has_value());
+            QVERIFY2(error.contains(QStringLiteral("sieci")), qPrintable(error));
+            QVERIFY(!QDir(modelsDir + QStringLiteral("/.staging")).exists());
+            QVERIFY(!session.cancelImport(9999));
+            QCOMPARE(session.activeImportId(), quint64(0));
+        }
+
+        // 4. Import lokalny poprawnego Pipera i persystencja po restarcie.
+        const QString sourceDir = dataHome.path() + QStringLiteral("/src-piper");
+        QVERIFY(QDir().mkpath(sourceDir));
+        {
+            QFile weights(sourceDir + QStringLiteral("/pl_PL-darkman-medium.onnx"));
+            QVERIFY(weights.open(QIODevice::WriteOnly));
+            QCOMPARE(weights.write(QByteArray(4096, '\x08')), qint64(4096));
+            weights.close();
+            QFile config(sourceDir + QStringLiteral("/pl_PL-darkman-medium.onnx.json"));
+            QVERIFY(config.open(QIODevice::WriteOnly));
+            config.write(R"({"language":{"code":"pl_PL"},"license":"CC0-1.0"})");
+            config.close();
+        }
+        {
+            audioticon::ui::CoreSession session;
+            error.clear();
+            const std::optional<audioticon::ui::ModelImportResult> imported =
+                session.importLocal(sourceDir, QString(), false, &error);
+            QVERIFY2(imported.has_value(), qPrintable(error));
+            QCOMPARE(imported->status, QStringLiteral("completed"));
+            QCOMPARE(imported->modelId, QStringLiteral("piper/pl_PL-darkman-medium"));
+            QCOMPARE(imported->modelStatus, QStringLiteral("available"));
+            QVERIFY(imported->source.startsWith(QStringLiteral("local:")));
+            QCOMPARE(session.listModels().size(), 1);
+        }
+
+        {
+            audioticon::ui::CoreSession reopened;
+            const QVector<audioticon::ui::ModelInfo> models = reopened.listModels();
+            QCOMPARE(models.size(), 1);
+            QCOMPARE(models.first().id, QStringLiteral("piper/pl_PL-darkman-medium"));
+            QCOMPARE(models.first().license, QStringLiteral("CC0-1.0"));
+            QVERIFY(models.first().isAvailable());
+
+            // 5. Weryfikacja checksumu (bez sidecara: tylko suma bieżąca).
+            error.clear();
+            const std::optional<audioticon::ui::ModelVerifyResult> verified =
+                reopened.verifyModel(QStringLiteral("piper/pl_PL-darkman-medium"), &error);
+            QVERIFY2(verified.has_value(), qPrintable(error));
+            QCOMPARE(verified->status, QStringLiteral("available"));
+            QVERIFY(!verified->checked);
+            QVERIFY(!verified->actualSha256.isEmpty());
+
+            // 6. Path traversal w id jest odrzucane.
+            QVERIFY(!reopened.removeModel(QStringLiteral("piper/../llm/x")));
+            QCOMPARE(reopened.listModels().size(), 1);
+
+            // 7. Usunięcie modelu i czysty katalog.
+            QVERIFY(reopened.removeModel(QStringLiteral("piper/pl_PL-darkman-medium")));
+            QVERIFY(reopened.listModels().isEmpty());
+            QVERIFY(!QFile::exists(modelsDir + QStringLiteral("/piper/pl_PL-darkman-medium.onnx")));
+        }
+
+        // 8. Odrzucenie złego formatu i niezgodnego checksumu.
+        {
+            audioticon::ui::CoreSession session;
+            const QString bad = dataHome.path() + QStringLiteral("/not-a-model.txt");
+            QFile file(bad);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("hello");
+            file.close();
+            error.clear();
+            QVERIFY(!session.importLocal(bad, QString(), false, &error).has_value());
+            QVERIFY(!error.isEmpty());
+
+            const QString shaDir = dataHome.path() + QStringLiteral("/src-bad-sha");
+            QVERIFY(QDir().mkpath(shaDir));
+            QFile weights(shaDir + QStringLiteral("/pl_PL-gosia-medium.onnx"));
+            QVERIFY(weights.open(QIODevice::WriteOnly));
+            weights.write(QByteArray(4096, '\x09'));
+            weights.close();
+            QFile config(shaDir + QStringLiteral("/pl_PL-gosia-medium.onnx.json"));
+            QVERIFY(config.open(QIODevice::WriteOnly));
+            config.write(R"({"language":{"code":"pl_PL"},"license":"CC0-1.0"})");
+            config.close();
+            QFile sidecar(shaDir + QStringLiteral("/pl_PL-gosia-medium.onnx.sha256"));
+            QVERIFY(sidecar.open(QIODevice::WriteOnly));
+            sidecar.write(QByteArray(64, '0') + "  pl_PL-gosia-medium.onnx\n");
+            sidecar.close();
+
+            error.clear();
+            QVERIFY(!session.importLocal(shaDir, QString(), false, &error).has_value());
+            QVERIFY2(error.contains(QStringLiteral("checksum")), qPrintable(error));
+            QVERIFY(session.listModels().isEmpty());
+        }
+    }
 };
 
 QTEST_MAIN(Tests)

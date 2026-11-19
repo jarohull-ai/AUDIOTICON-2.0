@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <memory>
@@ -83,6 +84,96 @@ struct ModelCatalogStatus {
     QString message;
 };
 
+// ---- M18: dodawanie modeli (presety / lokalny / zdalny) -------------------
+
+/// Jeden plik presetu lub kandydata zdalnego.
+struct ModelPresetFile {
+    QString role;
+    QString fileName;
+    QString url;
+    QString sha256;
+    qint64 sizeBytes = 0;
+};
+
+/// Jeden z czterech sposobów dodawania modeli.
+struct ModelSourceInfo {
+    QString kind;
+    QString name;
+    QString detail;
+    bool network = false;
+    bool requiresExplicitConsent = false;
+};
+
+/// Preset kurowany: komplet metadanych bez pobierania.
+struct CuratedPreset {
+    QString id;
+    QString kind;
+    QString name;
+    QString author;
+    QString license;
+    QString language;
+    QString format;
+    qint64 sizeBytes = 0;
+    QString source;
+    QString sourceReference;
+    QString origin;
+    QString description;
+    QVector<ModelPresetFile> files;
+    bool installed = false;
+    QString installedStatus;
+};
+
+/// Podgląd kandydata zdalnego — wszystko, co UI pokazuje przed pobraniem.
+struct RemoteCandidate {
+    QString id;
+    QString kind;
+    QString name;
+    QString author;
+    QString license;
+    QString language;
+    QString format;
+    qint64 sizeBytes = 0;
+    QString source;
+    QString sourceReference;
+    QString originUrl;
+    bool curated = false;
+    bool downloadable = false;
+    QStringList blockers;
+    QVector<ModelPresetFile> files;
+};
+
+/// Wynik importu lub pobrania.
+struct ModelImportResult {
+    quint64 importId = 0;
+    QString status;
+    QString modelId;
+    QString modelPath;
+    QString modelStatus;
+    QString message;
+    QString source;
+};
+
+/// Wynik jawnej weryfikacji checksumu.
+struct ModelVerifyResult {
+    QString id;
+    QString kind;
+    QString status;
+    bool checked = false;
+    QString expectedSha256;
+    QString actualSha256;
+    bool matches = false;
+    qint64 sizeBytes = 0;
+    QString message;
+};
+
+/// Wynik usunięcia modelu.
+struct ModelRemoveResult {
+    QString id;
+    QString kind;
+    int removedFiles = 0;
+    bool selectionCleared = false;
+};
+
 /// Owning handle to the Rust engine: the job registry and the tokio runtime
 /// behind it live on the Rust side.
 ///
@@ -124,6 +215,43 @@ public:
 
     /// Removes the persisted selection; false with `errorOut` on I/O failure.
     bool clearModelSelection(QString *errorOut = nullptr);
+
+    // ---- M18: dodawanie modeli -------------------------------------------
+    // Pobranie jest jedyną operacją, która może otworzyć sieć — i tylko z
+    // jawną zgodą oraz klientem HTTPS dostarczonym przez aplikację.
+
+    /// Cztery źródła modeli (curated / local / GitHub / Hugging Face).
+    QVector<ModelSourceInfo> listSources() const;
+
+    /// Presety znane z Portable Local Studio wraz ze stanem instalacji.
+    QVector<CuratedPreset> listCuratedPresets() const;
+
+    /// Metadane kandydata do pobrania; puste przy błędzie (z `errorOut`).
+    std::optional<RemoteCandidate> inspectRemoteCandidate(const QString &reference,
+                                                          QString *errorOut = nullptr) const;
+
+    /// Import pliku, katalogu lub ZIP. Puste przy błędzie walidacji.
+    std::optional<ModelImportResult> importLocal(const QString &path, const QString &kind,
+                                                 bool acceptUnknownLicense,
+                                                 QString *errorOut = nullptr) const;
+
+    /// Pobranie na jawne żądanie (`consent` musi być true).
+    std::optional<ModelImportResult> downloadRemote(const QString &reference,
+                                                    const QString &expectedSha256,
+                                                    quint64 expectedSize, bool consent,
+                                                    QString *errorOut = nullptr) const;
+
+    /// Anuluje trwający import; false gdy zdążył się zakończyć.
+    bool cancelImport(quint64 importId);
+
+    /// Id najstarszego trwającego importu (0 = brak).
+    quint64 activeImportId() const;
+
+    /// Jawne przeliczenie SHA-256 i porównanie z sidecarem.
+    std::optional<ModelVerifyResult> verifyModel(const QString &id, QString *errorOut = nullptr) const;
+
+    /// Usuwa model i czyści jego wybór.
+    std::optional<ModelRemoveResult> removeModel(const QString &id, QString *errorOut = nullptr);
 
 private:
     struct Impl;
