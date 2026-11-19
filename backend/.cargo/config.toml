@@ -1,0 +1,8 @@
+# Keep Rust artifacts where the Qt build expects them.
+#
+# ui/src/bridge/rustlink.pri links `<backend>/target/debug/libaudioticon_bridge.a`
+# and includes headers from `<backend>/target/cxxbridge`. Pinning target-dir here
+# means a stray `CARGO_TARGET_DIR` exported in the shell cannot silently move the
+# staticlib out from under qmake.
+[build]
+target-dir = "target"

@@ -1,0 +1,36 @@
+# Rust/build outputs
+backend/target/
+ui/build-*/
+ui/.qmake.stash
+*.o
+*.a
+*.so
+*.d
+# Local runtime data and models
+models/
+voices/
+venv/
+.venv/
+**/.cache/
+**/.local/
+*.onnx
+*.onnx.json
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+# Release artifacts and large media
+release/
+*.mp4
+*.mov
+*.mkv
+*.webm
+# IDE/OS
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Large generated/demo audio samples
+backend/docs/samples/*.mp3

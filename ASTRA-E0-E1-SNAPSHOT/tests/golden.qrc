@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/golden">
+        <file alias="tts-golden.json">data/tts-golden.json</file>
+    </qresource>
+</RCC>
