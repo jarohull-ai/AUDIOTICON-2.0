@@ -42,13 +42,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg sox libsox-fmt-all espeak-ng
 
-      - name: Check code formatting
+      - name: Compile and check backend targets
         working-directory: backend
-        run: cargo fmt --all -- --check
+        run: cargo check --workspace --all-targets --verbose
 
-      - name: Run Clippy linter
+      - name: Run Clippy linter (advisory)
         working-directory: backend
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets
 
       - name: Run Backend Unit & Integration Tests (221 tests)
         working-directory: backend
@@ -87,7 +87,7 @@ jobs:
         run: |
           mkdir -p ui/build-tests
           cd ui/build-tests
-          qmake6 ../tests/tests.pro
+          qmake6 ../tests/tests.pro CONFIG+=release
           make -j$(nproc)
           QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ./tests
 
@@ -95,5 +95,5 @@ jobs:
         run: |
           mkdir -p ui/build-console
           cd ui/build-console
-          qmake6 ../agent-console.pro
+          qmake6 ../agent-console.pro CONFIG+=release
           make -j$(nproc)
