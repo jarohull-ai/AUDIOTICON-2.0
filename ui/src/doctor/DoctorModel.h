@@ -115,10 +115,10 @@ public:
     bool xdgCacheWritable() const { return m_xdgCacheWritable; }
 
     bool firstRunCompleted() const { return m_firstRunCompleted; }
-    void setFirstRunCompleted(bool completed);
+    Q_INVOKABLE void setFirstRunCompleted(bool completed);
 
     bool inspectionMode() const { return m_inspectionMode; }
-    void setInspectionMode(bool enabled);
+    Q_INVOKABLE void setInspectionMode(bool enabled);
 
     bool isEnvironmentReady() const;
     int errorCount() const { return m_errorCount; }

@@ -1018,6 +1018,7 @@ struct PiperWorkerProcess {
 impl Drop for PiperWorkerProcess {
     fn drop(&mut self) {
         let _ = self.process.kill();
+        let _ = self.process.wait();
     }
 }
 
