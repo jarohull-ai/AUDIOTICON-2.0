@@ -56,3 +56,13 @@ make -j$(nproc)
 ## Licencja
 
 Kod i zależności są opisane w plikach LICENSE oraz THIRD_PARTY_NOTICES w odpowiednich katalogach.
+
+### Model Hub
+
+| 780×560 | 1180×850 | 1920×1080 |
+|---|---|---|
+| ![Model Hub 780×560](docs/screenshots/audioticon-m19-modelhub-780x560.png) | ![Model Hub 1180×850](docs/screenshots/audioticon-m19-modelhub-1180x850.png) | ![Model Hub 1920×1080](docs/screenshots/audioticon-m19-modelhub-1920x1080.png) |
+
+Jawny modal zgody dla źródeł zdalnych:
+
+![Model import consent](docs/screenshots/audioticon-m19-consent-1180x850.png)

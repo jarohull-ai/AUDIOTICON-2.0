@@ -12,6 +12,8 @@
         <file alias="qml/WallpaperBackground.qml">qml/WallpaperBackground.qml</file>
         <file alias="qml/WallpaperSettings.qml">qml/WallpaperSettings.qml</file>
         <file alias="qml/DoctorView.qml">qml/DoctorView.qml</file>
+        <file alias="qml/ModelHubView.qml">qml/ModelHubView.qml</file>
+        <file alias="qml/ModelCard.qml">qml/ModelCard.qml</file>
         <file alias="qml/FirstRunWizard.qml">qml/FirstRunWizard.qml</file>
         <file alias="assets/wallpapers/pexels-artyusufpatel-8998289.jpg">../assets/wallpapers/pexels-artyusufpatel-8998289.jpg</file>
         <file alias="i18n/en.json">i18n/en.json</file>

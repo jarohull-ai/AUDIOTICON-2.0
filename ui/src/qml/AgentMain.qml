@@ -32,8 +32,8 @@ ApplicationWindow {
     property int revision: 0
     readonly property real effectiveGlass: (typeof wallpaper !== "undefined" && wallpaper) ? wallpaper.glassOpacity : feed.glass
 
-    // Moduły i stan nawigacji M6
-    property string activeModule: "studio"   // "studio" | "agent" | "voicelab" | "projects" | "sfx" | "ledger" | "doctor"
+    // Moduły i stan nawigacji M6 / M19
+    property string activeModule: "studio"   // "studio" | "agent" | "voicelab" | "projects" | "sfx" | "ledger" | "doctor" | "models"
     property bool inspectorOpen: true
     property bool inspectorPinned: true
     property string currentInspectorTab: "queue"
@@ -60,6 +60,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+5"; onActivated: win.activeModule = "sfx" }
     Shortcut { sequence: "Ctrl+6"; onActivated: win.activeModule = "ledger" }
     Shortcut { sequence: "Ctrl+7"; onActivated: win.activeModule = "doctor" }
+    Shortcut { sequence: "Ctrl+8"; onActivated: win.activeModule = "models" }
     Shortcut { sequence: "Ctrl+I"; onActivated: win.inspectorOpen = !win.inspectorOpen }
     Shortcut {
         sequence: "Ctrl+J"
@@ -192,13 +193,15 @@ ApplicationWindow {
                 }
                 // Active voice / engine pill
                 Rectangle {
+                    readonly property bool hasActiveModel: (typeof studio !== "undefined" && studio && studio.activeModelId.length > 0)
+                                                           || (win.activeDoctor && win.activeDoctor.hasVoiceModel)
                     implicitWidth: modelText.implicitWidth + 24; implicitHeight: 26; radius: 13
                     color: (win.activeDoctor && win.activeDoctor.inspectionMode)
                            ? "#241c09"
-                           : (win.activeDoctor && !win.activeDoctor.hasVoiceModel ? "#260e14" : "#0e2220")
+                           : (!hasActiveModel ? "#260e14" : "#0e2220")
                     border.color: (win.activeDoctor && win.activeDoctor.inspectionMode)
                                   ? "#8f7014"
-                                  : (win.activeDoctor && !win.activeDoctor.hasVoiceModel ? "#ff3b56" : "#1b6e4b")
+                                  : (!hasActiveModel ? "#ff3b56" : "#1b6e4b")
                     Text {
                         id: modelText
                         anchors.centerIn: parent
@@ -209,6 +212,9 @@ ApplicationWindow {
                             if (typeof studio !== "undefined" && studio && studio.isBusy) {
                                 return qsTr("SYNTHESIS %1%").arg(Math.round(studio.taskPercent));
                             }
+                            if (typeof studio !== "undefined" && studio && studio.activeModelId.length > 0) {
+                                return studio.activeModelId + qsTr(" · 44.1 kHz");
+                            }
                             if (win.activeDoctor && win.activeDoctor.hasVoiceModel) {
                                 return win.activeDoctor.activeModelName + qsTr(" · 44.1 kHz");
                             }
@@ -216,8 +222,13 @@ ApplicationWindow {
                         }
                         color: (win.activeDoctor && win.activeDoctor.inspectionMode)
                                ? "#ffd43b"
-                               : (win.activeDoctor && !win.activeDoctor.hasVoiceModel ? "#ff8093" : win.accent)
+                               : (!parent.hasActiveModel ? "#ff8093" : win.accent)
                         font.family: "monospace"; font.pixelSize: 10
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: win.activeModule = "models"
                     }
                 }
                 Button {
@@ -459,10 +470,21 @@ ApplicationWindow {
                         onReturnToStudioRequested: win.activeModule = "studio"
                     }
 
+                    // WIDOK 4: MODEL HUB / KATALOG MODELI (M19)
+                    ModelHubView {
+                        id: modelHubView
+                        anchors.fill: parent
+                        visible: win.activeModule === "models"
+                        accent: win.accent
+                        glass: win.effectiveGlass
+                        onReturnToStudioRequested: win.activeModule = "studio"
+                    }
+
                     // PLANNED MODULES PLACEHOLDER (voicelab, projects, sfx, ledger — P1)
                     Rectangle {
                         anchors.fill: parent
-                        visible: win.activeModule !== "studio" && win.activeModule !== "agent" && win.activeModule !== "doctor"
+                        visible: win.activeModule !== "studio" && win.activeModule !== "agent"
+                                 && win.activeModule !== "doctor" && win.activeModule !== "models"
                         radius: 16
                         color: Qt.rgba(.02, .04, .06, win.effectiveGlass)
                         border.color: "#1e3a43"
@@ -532,7 +554,7 @@ ApplicationWindow {
                 }
                 Item { Layout.fillWidth: true }
                 Text {
-                    text: qsTr("Ctrl+1..7 modules   ·   Ctrl+I inspector   ·   Space play/pause   ·   ESC stop")
+                    text: qsTr("Ctrl+1..8 modules   ·   Ctrl+I inspector   ·   Space play/pause   ·   ESC stop")
                     color: "#52707d"; font.pixelSize: 10
                 }
             }

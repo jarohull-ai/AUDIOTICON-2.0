@@ -1554,6 +1554,313 @@ private slots:
             QVERIFY(session.listModels().isEmpty());
         }
     }
+
+    // M19: Model Hub UI — pusty katalog, presety curated, modal jawnej zgody,
+    // model lokalny / uszkodzony / brak metadanych / incomplete, status aktywnego
+    // modelu, anulowanie importu oraz screenshoty 780x560, 1180x850, 1920x1080.
+    void modelHubUiEmptyCuratedAndConsentModal()
+    {
+        freshScope();
+        ScopedEnv xdgGuard("XDG_DATA_HOME");
+        ScopedEnv mockGuard("AUDIOTICON_MOCK_RENDER");
+
+        QTemporaryDir dataHome;
+        QVERIFY(dataHome.isValid());
+        qputenv("XDG_DATA_HOME", dataHome.path().toUtf8());
+        qunsetenv("AUDIOTICON_MOCK_RENDER");
+
+        AgentModel agent;
+        StudioBridge studio;
+        WallpaperModel wp(QStringLiteral("astra-ui-test"), QStringLiteral("astra-ui-test"));
+        DoctorModel doc;
+        doc.completeFirstRun();
+        QTemporaryDir langDir;
+        Translator translator(langDir.path() + "/language");
+        translator.setChoice(QStringLiteral("pl"));
+        qApp->installTranslator(&translator);
+
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("feed", &agent);
+        engine.rootContext()->setContextProperty("studio", &studio);
+        engine.rootContext()->setContextProperty("wallpaper", &wp);
+        engine.rootContext()->setContextProperty("doctor", &doc);
+        engine.rootContext()->setContextProperty("i18n", &translator);
+        engine.load(QUrl("qrc:/qml/AgentMain.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(window);
+        window->setProperty("activeModule", QStringLiteral("models"));
+        QTest::qWait(80);
+
+        auto *hub = window->findChild<QObject *>("modelHubView");
+        QVERIFY(hub);
+        QCOMPARE(hub->property("visible").toBool(), true);
+
+        // 1. Pusty katalog lokalny
+        hub->setProperty("activeSection", QStringLiteral("local"));
+        QTest::qWait(60);
+        const QVariantList localEmpty = hub->property("localModels").toList();
+        QVERIFY(localEmpty.isEmpty());
+        auto *emptyNotice = window->findChild<QObject *>("emptyCatalogNotice");
+        QVERIFY(emptyNotice);
+        QCOMPARE(emptyNotice->property("visible").toBool(), true);
+        auto *activeLabel = window->findChild<QObject *>("activeModelLabel");
+        QVERIFY(activeLabel);
+        QVERIFY(activeLabel->property("text").toString().contains(QStringLiteral("Nie wybrano")));
+
+        // 2. Presety curated — obecne bez pobierania i bez .staging
+        hub->setProperty("activeSection", QStringLiteral("curated"));
+        QTest::qWait(60);
+        const QVariantList presets = hub->property("presets").toList();
+        QVERIFY2(presets.size() >= 8, "Brak presetów curated w Model Hub");
+        QVERIFY(!QDir(dataHome.path() + QStringLiteral("/audioticon/models/.staging")).exists());
+
+        // Filtrowanie typów (Piper / Whisper / LLM / Wszystkie)
+        hub->setProperty("activeKindFilter", QStringLiteral("piper_tts"));
+        QTest::qWait(30);
+        const QVariantList piperPresets = hub->property("filteredPresets").toList();
+        QVERIFY(piperPresets.size() >= 5);
+        hub->setProperty("activeKindFilter", QStringLiteral("whisper_asr"));
+        QTest::qWait(30);
+        QVERIFY(hub->property("filteredPresets").toList().size() >= 2);
+        hub->setProperty("activeKindFilter", QStringLiteral("local_llm"));
+        QTest::qWait(30);
+        QVERIFY(hub->property("filteredPresets").toList().size() >= 1);
+        hub->setProperty("activeKindFilter", QStringLiteral("all"));
+        QTest::qWait(30);
+
+        // 3. Modal jawnej zgody przed pobraniem zdalnym
+        QVariant opened = false;
+        QVERIFY(QMetaObject::invokeMethod(
+            hub, "openConsentForReference",
+            Q_RETURN_ARG(QVariant, opened),
+            Q_ARG(QVariant, QStringLiteral("preset:piper/pl_PL-darkman-medium")),
+            Q_ARG(QVariant, QString()),
+            Q_ARG(QVariant, 63201294)));
+        QCOMPARE(opened.toBool(), true);
+        QTest::qWait(80);
+
+        auto *consentModal = window->findChild<QObject *>("remoteConsentModal");
+        auto *consentCheck = window->findChild<QObject *>("remoteConsentCheckbox");
+        auto *consentConfirm = window->findChild<QObject *>("remoteConsentConfirmBtn");
+        auto *consentAuthor = window->findChild<QObject *>("consentAuthorValue");
+        auto *consentLicense = window->findChild<QObject *>("consentLicenseValue");
+        auto *consentSource = window->findChild<QObject *>("consentSourceValue");
+        auto *netWarning = window->findChild<QObject *>("remoteNetworkWarning");
+        QVERIFY(consentModal && consentCheck && consentConfirm && consentAuthor
+                && consentLicense && consentSource && netWarning);
+        QCOMPARE(consentModal->property("visible").toBool(), true);
+        QTRY_COMPARE(consentModal->property("opened").toBool(), true);
+        QVERIFY(!consentAuthor->property("text").toString().isEmpty());
+        QVERIFY(!consentLicense->property("text").toString().isEmpty());
+        QVERIFY(!consentSource->property("text").toString().isEmpty());
+
+        // Bez jawnego zaznaczenia zgody przycisk potwierdzenia jest zablokowany
+        QCOMPARE(consentCheck->property("checked").toBool(), false);
+        QCOMPARE(consentConfirm->property("enabled").toBool(), false);
+
+        // Zrzut ekranu modalu zgody Glass (1180x850)
+        window->resize(1180, 850);
+        QTest::qWait(100);
+        const QImage consentShot = window->grabWindow();
+        QVERIFY(!consentShot.isNull());
+        QVERIFY(consentShot.save(QStringLiteral("/tmp/audioticon-m19-consent-1180x850.png")));
+
+        // Zaznaczenie zgody odblokowuje przycisk; kliknięcie w trybie offline kończy się
+        // jawnym błędem sieciowym (nigdy fałszywym sukcesem)
+        consentCheck->setProperty("checked", true);
+        QTest::qWait(40);
+        QCOMPARE(consentConfirm->property("enabled").toBool(), true);
+
+        studio.startDownloadRemote(QStringLiteral("preset:piper/pl_PL-darkman-medium"),
+                                   QString(), 63201294, true);
+        for (int i = 0; i < 60 && studio.importBusy(); ++i)
+            QTest::qWait(30);
+        QCOMPARE(studio.importBusy(), false);
+        QCOMPARE(studio.importStage(), QStringLiteral("failed"));
+        QVERIFY2(studio.importError().contains(QStringLiteral("sieci")),
+                 qPrintable(studio.importError()));
+        QVERIFY(studio.models().isEmpty());
+
+        qApp->removeTranslator(&translator);
+    }
+
+    void modelHubLocalStatesCancelAndScreenshots()
+    {
+        freshScope();
+        ScopedEnv xdgGuard("XDG_DATA_HOME");
+        ScopedEnv mockGuard("AUDIOTICON_MOCK_RENDER");
+
+        QTemporaryDir dataHome;
+        QVERIFY(dataHome.isValid());
+        qputenv("XDG_DATA_HOME", dataHome.path().toUtf8());
+        qunsetenv("AUDIOTICON_MOCK_RENDER");
+
+        const QString modelsDir = dataHome.path() + QStringLiteral("/audioticon/models");
+        QVERIFY(QDir().mkpath(modelsDir + QStringLiteral("/piper")));
+        QVERIFY(QDir().mkpath(modelsDir + QStringLiteral("/.staging/import-42")));
+
+        // 1. Model poprawny (available)
+        {
+            QFile w(modelsDir + QStringLiteral("/piper/pl_PL-darkman-medium.onnx"));
+            QVERIFY(w.open(QIODevice::WriteOnly));
+            QCOMPARE(w.write(QByteArray(4096, '\x08')), qint64(4096));
+            w.close();
+            QFile c(modelsDir + QStringLiteral("/piper/pl_PL-darkman-medium.onnx.json"));
+            QVERIFY(c.open(QIODevice::WriteOnly));
+            c.write(R"({"language":{"code":"pl_PL"},"license":"CC0-1.0"})");
+            c.close();
+        }
+        // 2. Model uszkodzony (corrupt — 0 B)
+        {
+            QFile w(modelsDir + QStringLiteral("/piper/pl_PL-broken-medium.onnx"));
+            QVERIFY(w.open(QIODevice::WriteOnly));
+            w.close();
+            QFile c(modelsDir + QStringLiteral("/piper/pl_PL-broken-medium.onnx.json"));
+            QVERIFY(c.open(QIODevice::WriteOnly));
+            c.write("{}");
+            c.close();
+        }
+        // 3. Model bez metadanych (missing_metadata — brak .onnx.json)
+        {
+            QFile w(modelsDir + QStringLiteral("/piper/pl_PL-nometa-medium.onnx"));
+            QVERIFY(w.open(QIODevice::WriteOnly));
+            QCOMPARE(w.write(QByteArray(4096, '\x07')), qint64(4096));
+            w.close();
+        }
+        // 4. Przerwany import w .staging (incomplete)
+        {
+            QFile intent(modelsDir + QStringLiteral("/.staging/import-42/intent.json"));
+            QVERIFY(intent.open(QIODevice::WriteOnly));
+            intent.write(R"({"import_id":42,"id":"piper/pl_PL-gosia-medium","kind":"piper_tts","format":"onnx","files":["pl_PL-gosia-medium.onnx","pl_PL-gosia-medium.onnx.json"],"source":"curated:preset:piper/pl_PL-gosia-medium","started_at_utc":"2026-11-19T09:00:00Z"})");
+            intent.close();
+        }
+
+        AgentModel agent;
+        StudioBridge studio;
+        WallpaperModel wp(QStringLiteral("astra-ui-test"), QStringLiteral("astra-ui-test"));
+        DoctorModel doc;
+        doc.completeFirstRun();
+        QTemporaryDir langDir;
+        Translator translator(langDir.path() + "/language");
+        translator.setChoice(QStringLiteral("pl"));
+        qApp->installTranslator(&translator);
+
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("feed", &agent);
+        engine.rootContext()->setContextProperty("studio", &studio);
+        engine.rootContext()->setContextProperty("wallpaper", &wp);
+        engine.rootContext()->setContextProperty("doctor", &doc);
+        engine.rootContext()->setContextProperty("i18n", &translator);
+        engine.load(QUrl("qrc:/qml/AgentMain.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(window);
+        window->setProperty("activeModule", QStringLiteral("models"));
+        auto *hub = window->findChild<QObject *>("modelHubView");
+        QVERIFY(hub);
+        hub->setProperty("activeSection", QStringLiteral("local"));
+        QTest::qWait(100);
+
+        const QVariantList localList = hub->property("localModels").toList();
+        QCOMPARE(localList.size(), 4);
+
+        QSet<QString> statuses;
+        for (const QVariant &v : localList)
+            statuses.insert(v.toMap().value(QStringLiteral("status")).toString());
+        QVERIFY(statuses.contains(QStringLiteral("available")));
+        QVERIFY(statuses.contains(QStringLiteral("corrupt")));
+        QVERIFY(statuses.contains(QStringLiteral("missing_metadata")));
+        QVERIFY(statuses.contains(QStringLiteral("incomplete")));
+
+        // Karta uszkodzonego, bez metadanych i incomplete nie pozwala wybrać jako aktywnego
+        auto *localRepeater = window->findChild<QObject *>("localModelsRepeater");
+        QVERIFY(localRepeater);
+        QCOMPARE(localRepeater->property("count").toInt(), 4);
+
+        QObject *corruptCard = nullptr;
+        QObject *nometaCard = nullptr;
+        QObject *goodCard = nullptr;
+        QObject *incompleteCard = nullptr;
+        for (int i = 0; i < 4; ++i) {
+            QQuickItem *item = nullptr;
+            QVERIFY(QMetaObject::invokeMethod(localRepeater, "itemAt",
+                                              Q_RETURN_ARG(QQuickItem *, item),
+                                              Q_ARG(int, i)));
+            QVERIFY(item);
+            const QString oname = item->objectName();
+            if (oname == QStringLiteral("localCard_piper/pl_PL-broken-medium")) corruptCard = item;
+            else if (oname == QStringLiteral("localCard_piper/pl_PL-nometa-medium")) nometaCard = item;
+            else if (oname == QStringLiteral("localCard_piper/pl_PL-darkman-medium")) goodCard = item;
+            else if (oname == QStringLiteral("localCard_piper/pl_PL-gosia-medium")) incompleteCard = item;
+        }
+        QVERIFY2(corruptCard && nometaCard && goodCard && incompleteCard,
+                 qPrintable(QString("Cards found: corrupt=%1 nometa=%2 good=%3 incomplete=%4")
+                            .arg(corruptCard != nullptr).arg(nometaCard != nullptr)
+                            .arg(goodCard != nullptr).arg(incompleteCard != nullptr)));
+        auto *corruptSelect = corruptCard->findChild<QObject *>("selectModelBtn");
+        auto *nometaSelect = nometaCard->findChild<QObject *>("selectModelBtn");
+        auto *goodSelect = goodCard->findChild<QObject *>("selectModelBtn");
+        auto *incompleteSelect = incompleteCard->findChild<QObject *>("selectModelBtn");
+        QVERIFY(corruptSelect && nometaSelect && goodSelect && incompleteSelect);
+        QCOMPARE(corruptSelect->property("enabled").toBool(), false);
+        QCOMPARE(nometaSelect->property("enabled").toBool(), false);
+        QCOMPARE(incompleteSelect->property("enabled").toBool(), false);
+        QCOMPARE(goodSelect->property("enabled").toBool(), true);
+
+        // Wybór poprawnego modelu -> status aktywnego modelu w UI
+        QVERIFY(studio.selectModel(QStringLiteral("piper/pl_PL-darkman-medium")));
+        QTest::qWait(80);
+        QCOMPARE(studio.activeModelId(), QStringLiteral("piper/pl_PL-darkman-medium"));
+        auto *activeLabel = window->findChild<QObject *>("activeModelLabel");
+        QVERIFY(activeLabel);
+        QVERIFY(activeLabel->property("text").toString().contains(QStringLiteral("piper/pl_PL-darkman-medium")));
+
+        // Weryfikacja szczegółowa
+        const QVariantMap verified = studio.verifyModelDetailed(QStringLiteral("piper/pl_PL-darkman-medium"));
+        QCOMPARE(verified.value(QStringLiteral("ok")).toBool(), true);
+        QVERIFY(!verified.value(QStringLiteral("actualSha256")).toString().isEmpty());
+
+        // Import anulowany: uruchomienie i natychmiastowe anulowanie nie pokazuje sukcesu
+        const QString srcDir = dataHome.path() + QStringLiteral("/src-cancel");
+        QVERIFY(QDir().mkpath(srcDir));
+        {
+            QFile f(srcDir + QStringLiteral("/pl_PL-cancel-medium.onnx"));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QByteArray(4096, '\x05'));
+            f.close();
+            QFile c(srcDir + QStringLiteral("/pl_PL-cancel-medium.onnx.json"));
+            QVERIFY(c.open(QIODevice::WriteOnly));
+            c.write(R"({"language":{"code":"pl_PL"},"license":"MIT"})");
+            c.close();
+        }
+        studio.startImportLocal(srcDir, QString(), false);
+        QVERIFY(studio.cancelActiveImport());
+        for (int i = 0; i < 60 && studio.importBusy(); ++i)
+            QTest::qWait(25);
+        QCOMPARE(studio.importStage(), QStringLiteral("cancelled"));
+        QVERIFY(!studio.inspectModel(QStringLiteral("piper/pl_PL-cancel-medium")).contains(QStringLiteral("id")));
+        auto *importBanner = window->findChild<QObject *>("importStatusBanner");
+        QVERIFY(importBanner);
+        QCOMPARE(importBanner->property("visible").toBool(), true);
+
+        // Screenshoty Model Hub w 780x560, 1180x850 i 1920x1080
+        studio.resetImportState();
+        QTest::qWait(50);
+        const QList<QSize> sizes = { QSize(780, 560), QSize(1180, 850), QSize(1920, 1080) };
+        for (const QSize &sz : sizes) {
+            window->resize(sz);
+            QTest::qWait(120);
+            const QImage shot = window->grabWindow();
+            QVERIFY(!shot.isNull());
+            QVERIFY(shot.save(QStringLiteral("/tmp/audioticon-m19-modelhub-%1x%2.png")
+                              .arg(sz.width()).arg(sz.height())));
+        }
+
+        qApp->removeTranslator(&translator);
+    }
 };
 
 QTEST_MAIN(Tests)

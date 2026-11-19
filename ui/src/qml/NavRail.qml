@@ -29,7 +29,8 @@ Rectangle {
         { id: "projects", icon: "📁", label: qsTr("Projects"),   key: "Ctrl+4" },
         { id: "sfx",      icon: "🔊", label: qsTr("Foley/SFX"),  key: "Ctrl+5" },
         { id: "ledger",   icon: "📊", label: qsTr("ACX Ledger"), key: "Ctrl+6" },
-        { id: "doctor",   icon: "🩺", label: qsTr("Doctor"),     key: "Ctrl+7" }
+        { id: "doctor",   icon: "🩺", label: qsTr("Doctor"),     key: "Ctrl+7" },
+        { id: "models",   icon: "📦", label: qsTr("Models"),     key: "Ctrl+8" }
     ]
 
     ColumnLayout {

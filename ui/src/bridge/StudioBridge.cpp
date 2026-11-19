@@ -3,7 +3,9 @@
 #include "voice/DirectiveParser.h"
 #include "voice/PolishVerbalizer.h"
 
+#include <QCoreApplication>
 #include <QDebug>
+#include <QMetaObject>
 
 namespace {
 // Polling, not push: the Rust registry answers from memory, so a tick costs a
@@ -49,6 +51,19 @@ StudioBridge::StudioBridge(QObject *parent)
 StudioBridge::~StudioBridge()
 {
     m_pollTimer.stop();
+    m_importCancelRequested.store(true);
+    if (m_session) {
+        const quint64 activeId = m_session->activeImportId();
+        if (activeId > 0)
+            m_session->cancelImport(activeId);
+    }
+    joinImportThread();
+}
+
+void StudioBridge::joinImportThread()
+{
+    if (m_importThread.joinable())
+        m_importThread.join();
 }
 
 bool StudioBridge::isPlaying() const
@@ -356,6 +371,233 @@ bool StudioBridge::removeModel(const QString &id)
     return true;
 }
 
+QVariantMap StudioBridge::verifyModelDetailed(const QString &id)
+{
+    if (!m_session) {
+        return QVariantMap{
+            {QStringLiteral("ok"), false},
+            {QStringLiteral("error"), QCoreApplication::translate("ModelHub", "Rust engine is not initialized")},
+        };
+    }
+    QString error;
+    const auto result = m_session->verifyModel(id, &error);
+    if (!result) {
+        m_modelError = error.isEmpty()
+                           ? QCoreApplication::translate("ModelHub", "Failed to verify model '%1'").arg(id)
+                           : error;
+        emit modelSelectionChanged();
+        return QVariantMap{
+            {QStringLiteral("ok"), false},
+            {QStringLiteral("id"), id},
+            {QStringLiteral("error"), m_modelError},
+        };
+    }
+    const bool ok = !result->checked || result->matches;
+    m_modelError = ok ? QString() : result->message;
+    emit modelSelectionChanged();
+    return QVariantMap{
+        {QStringLiteral("ok"), ok},
+        {QStringLiteral("id"), result->id},
+        {QStringLiteral("kind"), result->kind},
+        {QStringLiteral("status"), result->status},
+        {QStringLiteral("checked"), result->checked},
+        {QStringLiteral("expectedSha256"), result->expectedSha256},
+        {QStringLiteral("actualSha256"), result->actualSha256},
+        {QStringLiteral("matches"), result->matches},
+        {QStringLiteral("sizeBytes"), result->sizeBytes},
+        {QStringLiteral("message"), result->message},
+        {QStringLiteral("error"), ok ? QString() : result->message},
+    };
+}
+
+quint64 StudioBridge::activeImportId() const
+{
+    return m_session ? m_session->activeImportId() : 0;
+}
+
+bool StudioBridge::cancelActiveImport()
+{
+    m_importCancelRequested.store(true);
+    bool cancelledInCore = false;
+    if (m_session) {
+        const quint64 activeId = m_session->activeImportId();
+        if (activeId > 0)
+            cancelledInCore = m_session->cancelImport(activeId);
+        else if (m_currentImportId > 0)
+            cancelledInCore = m_session->cancelImport(m_currentImportId);
+    }
+    if (m_importBusy || cancelledInCore) {
+        m_importStage = QStringLiteral("cancelled");
+        m_importMessage = QCoreApplication::translate("ModelHub", "Import cancelled — staging cleaned up");
+        m_importError.clear();
+        emit importStateChanged();
+        return true;
+    }
+    return false;
+}
+
+void StudioBridge::startImportLocal(const QString &path, const QString &kind,
+                                    bool acceptUnknownLicense)
+{
+    if (!m_session || m_importBusy)
+        return;
+
+    joinImportThread();
+    m_importBusy = true;
+    m_importStage = QStringLiteral("staging");
+    m_importMessage = QCoreApplication::translate("ModelHub", "Staging & validating local files…");
+    m_importError.clear();
+    m_currentImportId = 0;
+    m_importCancelRequested.store(false);
+    emit importStateChanged();
+
+    auto *session = m_session.get();
+    m_importThread = std::thread([this, session, path, kind, acceptUnknownLicense]() {
+        QString error;
+        const auto result = session->importLocal(path, kind, acceptUnknownLicense, &error);
+        const bool cancelled = m_importCancelRequested.load()
+                               || (result.has_value() && result->status == QLatin1String("cancelled"));
+        if (cancelled && result.has_value() && !result->modelId.isEmpty()
+            && result->status == QLatin1String("completed")) {
+            session->removeModel(result->modelId);
+        }
+
+        QMetaObject::invokeMethod(this, [this, result, error, cancelled]() {
+            m_importBusy = false;
+            m_currentImportId = 0;
+            if (cancelled) {
+                m_importStage = QStringLiteral("cancelled");
+                m_importMessage = QCoreApplication::translate("ModelHub", "Import cancelled — staging cleaned up");
+                m_importError.clear();
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("cancelled"));
+                return;
+            }
+            if (!result) {
+                m_importStage = QStringLiteral("failed");
+                m_importError = error.isEmpty()
+                                    ? QCoreApplication::translate("ModelHub", "Local model import failed")
+                                    : error;
+                m_importMessage.clear();
+                m_modelError = m_importError;
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("failed"));
+                return;
+            }
+            // Never report success before verification confirms available status.
+            if (result->status == QLatin1String("completed")
+                && result->modelStatus == QLatin1String("available")) {
+                m_importStage = QStringLiteral("completed");
+                m_importMessage = result->message;
+                m_importError.clear();
+                m_modelError.clear();
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("completed"));
+            } else {
+                m_importStage = QStringLiteral("failed");
+                m_importError = result->message.isEmpty()
+                                    ? QCoreApplication::translate("ModelHub", "Model verification did not confirm availability")
+                                    : result->message;
+                m_importMessage.clear();
+                m_modelError = m_importError;
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("failed"));
+            }
+        }, Qt::QueuedConnection);
+    });
+}
+
+void StudioBridge::startDownloadRemote(const QString &reference,
+                                       const QString &expectedSha256,
+                                       quint64 expectedSize, bool consent)
+{
+    if (!m_session || m_importBusy)
+        return;
+
+    joinImportThread();
+    m_importBusy = true;
+    m_importStage = QStringLiteral("staging");
+    m_importMessage = QCoreApplication::translate("ModelHub", "Preparing staged download & verification…");
+    m_importError.clear();
+    m_currentImportId = 0;
+    m_importCancelRequested.store(false);
+    emit importStateChanged();
+
+    auto *session = m_session.get();
+    m_importThread = std::thread([this, session, reference, expectedSha256, expectedSize, consent]() {
+        QString error;
+        const auto result = session->downloadRemote(reference, expectedSha256, expectedSize, consent, &error);
+        const bool cancelled = m_importCancelRequested.load()
+                               || (result.has_value() && result->status == QLatin1String("cancelled"));
+
+        QMetaObject::invokeMethod(this, [this, result, error, cancelled]() {
+            m_importBusy = false;
+            m_currentImportId = 0;
+            if (cancelled) {
+                m_importStage = QStringLiteral("cancelled");
+                m_importMessage = QCoreApplication::translate("ModelHub", "Download cancelled — staging cleaned up");
+                m_importError.clear();
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("cancelled"));
+                return;
+            }
+            if (!result) {
+                m_importStage = QStringLiteral("failed");
+                m_importError = error.isEmpty()
+                                    ? QCoreApplication::translate("ModelHub", "Remote download failed")
+                                    : error;
+                m_importMessage.clear();
+                m_modelError = m_importError;
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("failed"));
+                return;
+            }
+            if (result->status == QLatin1String("completed")
+                && result->modelStatus == QLatin1String("available")) {
+                m_importStage = QStringLiteral("completed");
+                m_importMessage = result->message;
+                m_importError.clear();
+                m_modelError.clear();
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("completed"));
+            } else {
+                m_importStage = QStringLiteral("failed");
+                m_importError = result->message.isEmpty()
+                                    ? QCoreApplication::translate("ModelHub", "Downloaded model did not pass verification")
+                                    : result->message;
+                m_importMessage.clear();
+                m_modelError = m_importError;
+                emit importStateChanged();
+                emit modelSelectionChanged();
+                emit modelImportFinished(QStringLiteral("failed"));
+            }
+        }, Qt::QueuedConnection);
+    });
+}
+
+void StudioBridge::resetImportState()
+{
+    if (m_importBusy)
+        return;
+    m_importStage.clear();
+    m_importMessage.clear();
+    m_importError.clear();
+    m_currentImportId = 0;
+    emit importStateChanged();
+}
+
+QString StudioBridge::urlToLocalPath(const QUrl &url) const
+{
+    return url.isLocalFile() ? url.toLocalFile() : url.toString();
+}
+
 QVariantList StudioBridge::models() const
 {
     QVariantList list;
@@ -374,12 +616,18 @@ QVariantMap StudioBridge::modelStatus() const
         return QVariantMap{};
 
     const audioticon::ui::ModelCatalogStatus status = m_session->modelStatus();
+    int incompleteCount = 0;
+    for (const auto &model : m_session->listModels()) {
+        if (model.status == QLatin1String("incomplete"))
+            ++incompleteCount;
+    }
     return QVariantMap{
         {QStringLiteral("catalogRoot"), status.catalogRoot},
         {QStringLiteral("rootExists"), status.rootExists},
         {QStringLiteral("total"), status.total},
         {QStringLiteral("available"), status.available},
         {QStringLiteral("unavailable"), status.unavailable},
+        {QStringLiteral("incomplete"), incompleteCount},
         {QStringLiteral("activeId"), status.activeId},
         {QStringLiteral("activeKind"), status.activeKind},
         {QStringLiteral("activePath"), status.activePath},

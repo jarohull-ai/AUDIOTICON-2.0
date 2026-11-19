@@ -2,11 +2,14 @@
 
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 #include <QTimer>
 
+#include <atomic>
 #include <memory>
+#include <thread>
 
 #include "AudioticonCore.h"
 #include "AudioPlayer.h"
@@ -38,6 +41,13 @@ class StudioBridge : public QObject {
     // M17: lokalny katalog modeli (offline, bez pobierania)
     Q_PROPERTY(QString activeModelId READ activeModelId NOTIFY modelSelectionChanged)
     Q_PROPERTY(QString modelError READ modelError NOTIFY modelSelectionChanged)
+
+    // M19: stan importu / stagingu / weryfikacji w UI Model Hub
+    Q_PROPERTY(bool importBusy READ importBusy NOTIFY importStateChanged)
+    Q_PROPERTY(QString importStage READ importStage NOTIFY importStateChanged)
+    Q_PROPERTY(QString importMessage READ importMessage NOTIFY importStateChanged)
+    Q_PROPERTY(QString importError READ importError NOTIFY importStateChanged)
+    Q_PROPERTY(quint64 currentImportId READ currentImportId NOTIFY importStateChanged)
 
 public:
     explicit StudioBridge(QObject *parent = nullptr);
@@ -96,8 +106,27 @@ public:
     Q_INVOKABLE bool verifyModel(const QString &id);
     Q_INVOKABLE bool removeModel(const QString &id);
 
+    // M19: pomocnicze metody UI Model Hub (bez zmiany FFI/backendu)
+    Q_INVOKABLE QVariantMap verifyModelDetailed(const QString &id);
+    Q_INVOKABLE quint64 activeImportId() const;
+    Q_INVOKABLE bool cancelActiveImport();
+    Q_INVOKABLE void startImportLocal(const QString &path,
+                                      const QString &kind = QString(),
+                                      bool acceptUnknownLicense = false);
+    Q_INVOKABLE void startDownloadRemote(const QString &reference,
+                                         const QString &expectedSha256 = QString(),
+                                         quint64 expectedSize = 0,
+                                         bool consent = false);
+    Q_INVOKABLE void resetImportState();
+    Q_INVOKABLE QString urlToLocalPath(const QUrl &url) const;
+
     QString activeModelId() const;
     QString modelError() const { return m_modelError; }
+    bool importBusy() const { return m_importBusy; }
+    QString importStage() const { return m_importStage; }
+    QString importMessage() const { return m_importMessage; }
+    QString importError() const { return m_importError; }
+    quint64 currentImportId() const { return m_currentImportId; }
 
     // Entry points for a worker-side callback (BridgeObserver, M3 seam). The M5
     // flow does not use them: it polls the Rust registry instead.
@@ -126,10 +155,15 @@ signals:
     // Zakończony import/pobranie: `completed`, `cancelled` albo `failed`.
     void modelImportFinished(const QString &status);
 
+    // M19: zmiana stanu importu/stagingu/weryfikacji
+    void importStateChanged();
+
 private slots:
     void pollJob();
 
 private:
+    void joinImportThread();
+
     QString m_taskStatus = QStringLiteral("Idle");
     QString m_statusMessage;
     double m_taskPercent = 0.0;
@@ -140,6 +174,14 @@ private:
     QVariantList m_segments;
     bool m_isBusy = false;
     quint64 m_jobId = 0;
+
+    bool m_importBusy = false;
+    QString m_importStage;
+    QString m_importMessage;
+    QString m_importError;
+    quint64 m_currentImportId = 0;
+    std::atomic<bool> m_importCancelRequested{false};
+    std::thread m_importThread;
 
     AudioPlayer *m_player = nullptr;
     bool m_autoPlayOnFinish = false;
