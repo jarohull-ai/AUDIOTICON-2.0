@@ -186,26 +186,34 @@ impl CuratedPreset {
 
 fn piper_preset(stem: &str, name: &str, license: &str, description: &str) -> CuratedPreset {
     let lower = stem.to_lowercase();
-    let parts: Vec<&str> = lower.split('-').collect();
-    let (locale, voice, quality) = (
-        parts.first().copied().unwrap_or("pl_pl"),
-        parts.get(1).copied().unwrap_or("voice"),
-        parts.get(2).copied().unwrap_or("medium"),
+    let parts_lower: Vec<&str> = lower.split('-').collect();
+    let parts_orig: Vec<&str> = stem.split('-').collect();
+    let locale_orig = parts_orig.first().copied().unwrap_or("pl_PL");
+    let (voice, quality) = (
+        parts_lower.get(1).copied().unwrap_or("voice"),
+        parts_lower.get(2).copied().unwrap_or("medium"),
     );
-    let lang = locale.split('_').next().unwrap_or("pl");
-    let path = format!("{lang}/{locale}/{voice}/{quality}/{stem}");
-    let base = format!("https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/{path}");
+    let lang = locale_orig.split('_').next().unwrap_or("pl").to_lowercase();
+    let path = format!("{lang}/{locale_orig}/{voice}/{quality}/{stem}");
+    let base = format!("https://huggingface.co/rhasspy/piper-voices/resolve/main/{path}");
+    let size_bytes = if quality == "high" {
+        114 * MIB
+    } else if quality == "low" {
+        20 * MIB
+    } else {
+        63 * MIB
+    };
     CuratedPreset {
         id: format!("piper/{stem}"),
         kind: ModelKind::PiperTts,
         name: name.to_string(),
         author: "rhasspy / Piper voices".to_string(),
         license: license.to_string(),
-        language: Some(locale.to_string()),
+        language: Some(locale_orig.to_string()),
         format: ModelFormat::Onnx,
-        size_bytes: 63 * MIB,
+        size_bytes,
         source: ModelSourceKind::HuggingFace,
-        source_reference: "rhasspy/piper-voices@v1.0.0".to_string(),
+        source_reference: "rhasspy/piper-voices@main".to_string(),
         origin: "Portable Local Studio".to_string(),
         description: description.to_string(),
         files: vec![
@@ -214,7 +222,7 @@ fn piper_preset(stem: &str, name: &str, license: &str, description: &str) -> Cur
                 file_name: format!("{stem}.onnx"),
                 url: format!("{base}.onnx"),
                 sha256: None,
-                size_bytes: 63 * MIB,
+                size_bytes,
             },
             PresetFile {
                 role: PresetFileRole::Config,
@@ -252,6 +260,40 @@ fn whisper_preset(stem: &str, name: &str, size_bytes: u64) -> CuratedPreset {
     }
 }
 
+fn llm_preset(
+    stem: &str,
+    name: &str,
+    author: &str,
+    license: &str,
+    lang: &str,
+    size_bytes: u64,
+    repo: &str,
+    file: &str,
+    description: &str,
+) -> CuratedPreset {
+    CuratedPreset {
+        id: format!("llm/{stem}"),
+        kind: ModelKind::LocalLlm,
+        name: name.to_string(),
+        author: author.to_string(),
+        license: license.to_string(),
+        language: Some(lang.to_string()),
+        format: ModelFormat::Gguf,
+        size_bytes,
+        source: ModelSourceKind::HuggingFace,
+        source_reference: format!("{repo}@main"),
+        origin: "Community Hub (GGUF)".to_string(),
+        description: description.to_string(),
+        files: vec![PresetFile {
+            role: PresetFileRole::Weights,
+            file_name: format!("{stem}.gguf"),
+            url: format!("https://huggingface.co/{repo}/resolve/main/{file}"),
+            sha256: None,
+            size_bytes,
+        }],
+    }
+}
+
 /// Presety znane z Portable Local Studio (`setup-piper.sh`, `setup-whisper.sh`,
 /// `setup-llama.sh`) plus modele z listy kurowanej w `models.rs`.
 ///
@@ -260,11 +302,12 @@ fn whisper_preset(stem: &str, name: &str, size_bytes: u64) -> CuratedPreset {
 /// ją jako sidecar, żeby późniejsza weryfikacja miała punkt odniesienia.
 pub fn builtin_presets() -> Vec<CuratedPreset> {
     vec![
+        // --- Głosy Polskie (Piper TTS) ---
         piper_preset(
-            "pl_PL-gosia-medium",
-            "Gosia (polski głos żeński)",
+            "pl_PL-bass-high",
+            "Bass-PL (głęboki polski głos lektorski męski, High Quality)",
             "CC0-1.0",
-            "Podstawowy polski głos żeński używany przez Portable Local Studio.",
+            "Czysty, głęboki głos audiobookowy, idealny do czytania prozy i kryminałów.",
         ),
         piper_preset(
             "pl_PL-darkman-medium",
@@ -273,10 +316,42 @@ pub fn builtin_presets() -> Vec<CuratedPreset> {
             "Podstawowy polski głos męski używany przez Portable Local Studio.",
         ),
         piper_preset(
-            "pl_PL-mc_speech-medium",
-            "MC Speech (polski lektor)",
+            "pl_PL-gosia-medium",
+            "Gosia (polski głos żeński)",
             "CC0-1.0",
-            "Dodatkowy polski głos z listy kurowanej.",
+            "Ciepły, naturalny polski głos żeński używany przez Portable Local Studio.",
+        ),
+        piper_preset(
+            "pl_PL-mc_speech-medium",
+            "MC Speech (polski lektor radiowy)",
+            "CC0-1.0",
+            "Wyrazisty polski głos męski o radiowym charakterze.",
+        ),
+        piper_preset(
+            "pl_PL-mls_6892-low",
+            "MLS 6892 (lekki polski lektor męski)",
+            "CC0-1.0",
+            "Kompaktowy i szybki polski model lektorski (20 MB).",
+        ),
+
+        // --- Głosy Angielskie (Piper TTS) ---
+        piper_preset(
+            "en_US-ryan-medium",
+            "Ryan (English US, wyrazisty narrator męski)",
+            "CC0-1.0",
+            "Dynamiczny, czysty głos narratora do książek i dialogów.",
+        ),
+        piper_preset(
+            "en_US-amy-medium",
+            "Amy (English US, lektorka)",
+            "CC0-1.0",
+            "Klasyczny profesjonalny amerykański głos żeński.",
+        ),
+        piper_preset(
+            "en_US-bryce-medium",
+            "Bryce (English US, narrator męski)",
+            "CC0-1.0",
+            "Amerykański głos męski o zrównoważonym brzmieniu.",
         ),
         piper_preset(
             "en_US-lessac-medium",
@@ -285,35 +360,69 @@ pub fn builtin_presets() -> Vec<CuratedPreset> {
             "Angielski głos z listy kurowanej; licencja ogranicza użycie komercyjne.",
         ),
         piper_preset(
-            "en_US-amy-medium",
-            "Amy (English US, żeński)",
-            "CC0-1.0",
-            "Angielski głos z listy kurowanej.",
+            "en_GB-alan-medium",
+            "Alan (British English, lektor brytyjski)",
+            "CC-BY-4.0",
+            "Tradycyjny brytyjski akcent narracyjny, męski.",
         ),
-        whisper_preset("ggml-base", "Whisper base (ggml)", 148 * MIB),
-        whisper_preset("ggml-small", "Whisper small (ggml)", 488 * MIB),
-        CuratedPreset {
-            id: "llm/qwen2.5-3b-instruct-q4".to_string(),
-            kind: ModelKind::LocalLlm,
-            name: "Qwen2.5 3B Instruct (Q4_K_M)".to_string(),
-            author: "Alibaba Qwen".to_string(),
-            license: "Apache-2.0".to_string(),
-            language: Some("pl,en".to_string()),
-            format: ModelFormat::Gguf,
-            size_bytes: 1926 * MIB,
-            source: ModelSourceKind::HuggingFace,
-            source_reference: "Qwen/Qwen2.5-3B-Instruct-GGUF@main".to_string(),
-            origin: "Portable Local Studio (backend llama.cpp)".to_string(),
-            description: "Lokalny model instrukcyjny do pracy offline; wymaga llama.cpp."
-                .to_string(),
-            files: vec![PresetFile {
-                role: PresetFileRole::Weights,
-                file_name: "qwen2.5-3b-instruct-q4.gguf".to_string(),
-                url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf".to_string(),
-                sha256: None,
-                size_bytes: 1926 * MIB,
-            }],
-        },
+        piper_preset(
+            "en_GB-alba-medium",
+            "Alba (British English, lektorka brytyjska)",
+            "CC-BY-4.0",
+            "Spokojna brytyjska narratorka, żeńska.",
+        ),
+
+        // --- Whisper ASR / Transkrypcja ---
+        whisper_preset("ggml-tiny", "Whisper tiny (błyskawiczny, 75 MB)", 75 * MIB),
+        whisper_preset("ggml-base", "Whisper base (standardowy, lekki, 148 MB)", 148 * MIB),
+        whisper_preset("ggml-small", "Whisper small (dokładny dla audiobooków, 488 MB)", 488 * MIB),
+        whisper_preset("ggml-medium", "Whisper medium (najwyższa precyzja, 1.5 GB)", 1533 * MIB),
+
+        // --- Lokalne LLM (Reżyseria i generowanie skryptu) ---
+        llm_preset(
+            "qwen2.5-1.5b-instruct-q4",
+            "Qwen2.5 1.5B Instruct (ultraszybki, lekki dla każdego PC)",
+            "Alibaba Qwen",
+            "Apache-2.0",
+            "pl,en",
+            986 * MIB,
+            "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+            "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            "Kompaktowy asystent reżysera: świetnie radzi sobie z emoji i formatowaniem.",
+        ),
+        llm_preset(
+            "qwen2.5-3b-instruct-q4",
+            "Qwen2.5 3B Instruct (Q4_K_M)",
+            "Alibaba Qwen",
+            "Apache-2.0",
+            "pl,en",
+            1926 * MIB,
+            "Qwen/Qwen2.5-3B-Instruct-GGUF",
+            "qwen2.5-3b-instruct-q4_k_m.gguf",
+            "Lokalny model instrukcyjny do pracy offline; idealny do polskiego języka.",
+        ),
+        llm_preset(
+            "llama-3.2-1b-instruct-q4",
+            "Llama 3.2 1B Instruct (kompaktowy model Meta)",
+            "Meta Llama",
+            "Llama 3.2 Community",
+            "pl,en",
+            850 * MIB,
+            "bartowski/Llama-3.2-1B-Instruct-GGUF",
+            "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+            "Błyskawiczny model do analizy nastroju scen i przypisywania ról.",
+        ),
+        llm_preset(
+            "llama-3.2-3b-instruct-q4",
+            "Llama 3.2 3B Instruct (bogaty styl narracji)",
+            "Meta Llama",
+            "Llama 3.2 Community",
+            "pl,en",
+            2010 * MIB,
+            "bartowski/Llama-3.2-3B-Instruct-GGUF",
+            "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            "Zaawansowany model do parafrazowania i reżyserowania dialogów.",
+        ),
     ]
 }
 

@@ -10,6 +10,8 @@
 #include <QAudioDevice>
 #include <QDateTime>
 #include <QUrl>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <unistd.h>
 
 DoctorModel::DoctorModel(QObject *parent)
@@ -276,24 +278,50 @@ void DoctorModel::probeModels() {
         foundModel = m_activeModelPath;
     }
 
-    // 3. Sprawdź katalog modeli XDG
-    const QDir modelsDir(xdgModelsDir());
-    if (modelsDir.exists()) {
-        const QStringList filters = { QStringLiteral("*.onnx") };
-        const QFileInfoList files = modelsDir.entryInfoList(filters, QDir::Files | QDir::Readable);
-        m_installedModelsCount = files.size();
-
-        if (foundModel.isEmpty() && !files.isEmpty()) {
-            // Szukaj pl_PL-bass lub pierwszego
-            for (const QFileInfo &fi : files) {
-                if (fi.fileName().contains(QStringLiteral("pl_PL-bass"), Qt::CaseInsensitive)) {
-                    foundModel = fi.absoluteFilePath();
-                    break;
+    // 3. Sprawdź model_selection.json z katalogu XDG (kontrakt katalogu M17/M18)
+    if (foundModel.isEmpty()) {
+        const QString selPath = xdgDataDir() + QStringLiteral("/model_selection.json");
+        QFile selFile(selPath);
+        if (selFile.exists() && selFile.open(QIODevice::ReadOnly)) {
+            const QJsonDocument doc = QJsonDocument::fromJson(selFile.readAll());
+            if (doc.isObject()) {
+                const QString path = doc.object().value(QStringLiteral("path")).toString();
+                if (!path.isEmpty() && QFile::exists(path)) {
+                    foundModel = path;
                 }
             }
-            if (foundModel.isEmpty()) {
-                foundModel = files.first().absoluteFilePath();
+        }
+    }
+
+    // 4. Sprawdź katalog modeli XDG oraz podkatalog piper/
+    const QStringList searchDirs = {
+        xdgModelsDir() + QStringLiteral("/piper"),
+        xdgModelsDir()
+    };
+    QFileInfoList allFiles;
+    for (const QString &dirPath : searchDirs) {
+        const QDir dir(dirPath);
+        if (dir.exists()) {
+            const QFileInfoList files = dir.entryInfoList({QStringLiteral("*.onnx")}, QDir::Files | QDir::Readable);
+            for (const QFileInfo &fi : files) {
+                if (!allFiles.contains(fi)) {
+                    allFiles.append(fi);
+                }
             }
+        }
+    }
+    m_installedModelsCount = allFiles.size();
+
+    if (foundModel.isEmpty() && !allFiles.isEmpty()) {
+        // Szukaj pl_PL-bass lub pierwszego dostępnego
+        for (const QFileInfo &fi : allFiles) {
+            if (fi.fileName().contains(QStringLiteral("pl_PL-bass"), Qt::CaseInsensitive)) {
+                foundModel = fi.absoluteFilePath();
+                break;
+            }
+        }
+        if (foundModel.isEmpty()) {
+            foundModel = allFiles.first().absoluteFilePath();
         }
     }
 
@@ -401,6 +429,7 @@ bool DoctorModel::selectModelFile(const QString &filePath) {
     }
     QFileInfo fi(local);
     if (!fi.exists() || !fi.isFile()) {
+        m_activeModelPath.clear();
         return false;
     }
 

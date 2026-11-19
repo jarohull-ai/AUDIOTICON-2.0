@@ -247,7 +247,7 @@ Rectangle {
                             implicitHeight: 30
                             onClicked: {
                                 if (typeof activeDoctor !== "undefined" && activeDoctor) {
-                                    activeDoctor.setInspectionMode(!activeDoctor.inspectionMode);
+                                    activeDoctor.inspectionMode = !activeDoctor.inspectionMode;
                                 }
                             }
                         }
