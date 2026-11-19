@@ -1,0 +1,1114 @@
+{
+  "generatedFrom": "Portable-Local-Studio/scripts/server/tts-directives.cjs",
+  "cases": [
+    {
+      "name": "plain",
+      "input": "Dzień dobry.",
+      "verbalized": "Dzień dobry.",
+      "speakable": true,
+      "plain": "Dzień dobry.",
+      "text": "Dzień dobry.",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Dzień dobry.",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "date",
+      "input": "Dzień dobry, 24.02.2024.",
+      "verbalized": "Dzień dobry, dwudziestego czwartego lutego dwa tysiące dwudziestego czwartego roku.",
+      "speakable": true,
+      "plain": "Dzień dobry, dwudziestego czwartego lutego dwa tysiące dwudziestego czwartego roku.",
+      "text": "Dzień dobry, dwudziestego czwartego lutego dwa tysiące dwudziestego czwartego roku.",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Dzień dobry, dwudziestego czwartego lutego dwa tysiące dwudziestego czwartego roku.",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "dashes",
+      "input": "Tekst ⏸️ — ⏸️ dalej",
+      "verbalized": "Tekst ⏸️ — ⏸️ dalej",
+      "speakable": true,
+      "plain": "Tekst — dalej",
+      "text": "Tekst — dalej",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Tekst",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 800
+        },
+        {
+          "text": "dalej",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "pause-no-vs16",
+      "input": "Tekst ⏸ dalej",
+      "verbalized": "Tekst ⏸ dalej",
+      "speakable": true,
+      "plain": "Tekst dalej",
+      "text": "Tekst dalej",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Tekst",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 400
+        },
+        {
+          "text": "dalej",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "dots",
+      "input": "...",
+      "verbalized": "...",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 0,
+      "segments": [],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "emoji-only",
+      "input": "🙂",
+      "verbalized": "🙂",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 0,
+      "segments": [],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "turtle-chapter",
+      "input": "🐢 Dzień dobry 📖 dalej",
+      "verbalized": "🐢 Dzień dobry 📖 dalej",
+      "speakable": true,
+      "plain": "Dzień dobry dalej",
+      "text": "Dzień dobry dalej",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Dzień dobry",
+          "speed": 0.85,
+          "dsp": "",
+          "pauseMs": 900
+        },
+        {
+          "text": "dalej",
+          "speed": 0.85,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [
+        {
+          "index": 1,
+          "title": "dalej"
+        }
+      ],
+      "directives": [
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "chapter",
+          "pauseMs": 900,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "tempo",
+      "input": "🐇 szybciej 🐢 🐢 wolniej 🎙️ reset",
+      "verbalized": "🐇 szybciej 🐢 🐢 wolniej 🎙️ reset",
+      "speakable": true,
+      "plain": "szybciej wolniej reset",
+      "text": "szybciej wolniej reset",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "szybciej",
+          "speed": 1.15,
+          "dsp": "",
+          "pauseMs": 0
+        },
+        {
+          "text": "wolniej",
+          "speed": 0.83,
+          "dsp": "",
+          "pauseMs": 0
+        },
+        {
+          "text": "reset",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "faster",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "reset",
+          "pauseMs": 0,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "dsp-plans",
+      "input": "📻 radio 📱 telefon 🏛️ sala 🏛 katedra 🤫 szept",
+      "verbalized": "📻 radio 📱 telefon 🏛️ sala 🏛 katedra 🤫 szept",
+      "speakable": true,
+      "plain": "radio telefon sala katedra szept",
+      "text": "radio telefon sala katedra szept",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "radio",
+          "speed": 1,
+          "dsp": "radio",
+          "pauseMs": 0
+        },
+        {
+          "text": "telefon",
+          "speed": 1,
+          "dsp": "phone",
+          "pauseMs": 0
+        },
+        {
+          "text": "sala",
+          "speed": 1,
+          "dsp": "cathedral",
+          "pauseMs": 0
+        },
+        {
+          "text": "katedra",
+          "speed": 1,
+          "dsp": "cathedral",
+          "pauseMs": 0
+        },
+        {
+          "text": "szept",
+          "speed": 1,
+          "dsp": "whisper",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "dsp",
+          "pauseMs": 0,
+          "dsp": "radio"
+        },
+        {
+          "kind": "dsp",
+          "pauseMs": 0,
+          "dsp": "phone"
+        },
+        {
+          "kind": "dsp",
+          "pauseMs": 0,
+          "dsp": "cathedral"
+        },
+        {
+          "kind": "dsp",
+          "pauseMs": 0,
+          "dsp": "cathedral"
+        },
+        {
+          "kind": "dsp",
+          "pauseMs": 0,
+          "dsp": "whisper"
+        }
+      ]
+    },
+    {
+      "name": "breath",
+      "input": "😮‍💨 oddech",
+      "verbalized": "😮‍💨 oddech",
+      "speakable": true,
+      "plain": "oddech",
+      "text": "oddech",
+      "leadingPauseMs": 600,
+      "segments": [
+        {
+          "text": "oddech",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "pause",
+          "pauseMs": 600,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 600,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "chapters",
+      "input": "Rozdział 📖 pierwszy 📖 drugi",
+      "verbalized": "Rozdział 📖 pierwszy 📖 drugi",
+      "speakable": true,
+      "plain": "Rozdział pierwszy drugi",
+      "text": "Rozdział pierwszy drugi",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Rozdział",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 900
+        },
+        {
+          "text": "pierwszy",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 900
+        },
+        {
+          "text": "drugi",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [
+        {
+          "index": 1,
+          "title": "pierwszy"
+        },
+        {
+          "index": 2,
+          "title": "drugi"
+        }
+      ],
+      "directives": [
+        {
+          "kind": "chapter",
+          "pauseMs": 900,
+          "dsp": ""
+        },
+        {
+          "kind": "chapter",
+          "pauseMs": 900,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "chapter-only",
+      "input": "📖",
+      "verbalized": "📖",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 900,
+      "segments": [],
+      "chapters": [
+        {
+          "index": 0,
+          "title": "Chapter 1"
+        }
+      ],
+      "directives": [
+        {
+          "kind": "chapter",
+          "pauseMs": 900,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "amounts",
+      "input": "1 234,56 zł",
+      "verbalized": "tysiąc dwieście trzydzieści cztery złote pięćdziesiąt sześć groszy",
+      "speakable": true,
+      "plain": "tysiąc dwieście trzydzieści cztery złote pięćdziesiąt sześć groszy",
+      "text": "tysiąc dwieście trzydzieści cztery złote pięćdziesiąt sześć groszy",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "tysiąc dwieście trzydzieści cztery złote pięćdziesiąt sześć groszy",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "hour",
+      "input": "15:47",
+      "verbalized": "piętnasta czterdzieści siedem",
+      "speakable": true,
+      "plain": "piętnasta czterdzieści siedem",
+      "text": "piętnasta czterdzieści siedem",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "piętnasta czterdzieści siedem",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "hour-locative",
+      "input": "o 15:47",
+      "verbalized": "o piętnastej czterdzieści siedem",
+      "speakable": true,
+      "plain": "o piętnastej czterdzieści siedem",
+      "text": "o piętnastej czterdzieści siedem",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "o piętnastej czterdzieści siedem",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "hour-around",
+      "input": "około 7:05",
+      "verbalized": "około siódmej pięć",
+      "speakable": true,
+      "plain": "około siódmej pięć",
+      "text": "około siódmej pięć",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "około siódmej pięć",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "pieces-3",
+      "input": "3 szt.",
+      "verbalized": "trzy sztuki",
+      "speakable": true,
+      "plain": "trzy sztuki",
+      "text": "trzy sztuki",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "trzy sztuki",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "pieces-22",
+      "input": "22 szt.",
+      "verbalized": "dwadzieścia dwie sztuki",
+      "speakable": true,
+      "plain": "dwadzieścia dwie sztuki",
+      "text": "dwadzieścia dwie sztuki",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwadzieścia dwie sztuki",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "people",
+      "input": "5 os.",
+      "verbalized": "pięć osób",
+      "speakable": true,
+      "plain": "pięć osób",
+      "text": "pięć osób",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "pięć osób",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "percent",
+      "input": "12%",
+      "verbalized": "dwanaście procent",
+      "speakable": true,
+      "plain": "dwanaście procent",
+      "text": "dwanaście procent",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwanaście procent",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "percent-decimal",
+      "input": "1,5%",
+      "verbalized": "jeden przecinek pięć procent",
+      "speakable": true,
+      "plain": "jeden przecinek pięć procent",
+      "text": "jeden przecinek pięć procent",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "jeden przecinek pięć procent",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "abbrev-np",
+      "input": "np. to jest test",
+      "verbalized": "na przykład to jest test",
+      "speakable": true,
+      "plain": "na przykład to jest test",
+      "text": "na przykład to jest test",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "na przykład to jest test",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "abbrev-title",
+      "input": "m.in. prof. dr hab. Kowalski",
+      "verbalized": "między innymi profesor doktor habilitowany Kowalski",
+      "speakable": true,
+      "plain": "między innymi profesor doktor habilitowany Kowalski",
+      "text": "między innymi profesor doktor habilitowany Kowalski",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "między innymi profesor doktor habilitowany Kowalski",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "street",
+      "input": "ul. Marszałkowska 1",
+      "verbalized": "ulica Marszałkowska jeden",
+      "speakable": true,
+      "plain": "ulica Marszałkowska jeden",
+      "text": "ulica Marszałkowska jeden",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "ulica Marszałkowska jeden",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "year",
+      "input": "w 2024 r. było 100 zł",
+      "verbalized": "w dwa tysiące dwadzieścia cztery roku było sto złotych",
+      "speakable": true,
+      "plain": "w dwa tysiące dwadzieścia cztery roku było sto złotych",
+      "text": "w dwa tysiące dwadzieścia cztery roku było sto złotych",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "w dwa tysiące dwadzieścia cztery roku było sto złotych",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "millions",
+      "input": "2 000 000 osób",
+      "verbalized": "dwa miliony osób",
+      "speakable": true,
+      "plain": "dwa miliony osób",
+      "text": "dwa miliony osób",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwa miliony osób",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "zero",
+      "input": "0",
+      "verbalized": "zero",
+      "speakable": true,
+      "plain": "zero",
+      "text": "zero",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "zero",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "million",
+      "input": "1000000",
+      "verbalized": "jeden milion",
+      "speakable": true,
+      "plain": "jeden milion",
+      "text": "jeden milion",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "jeden milion",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "twenty-one",
+      "input": "21",
+      "verbalized": "dwadzieścia jeden",
+      "speakable": true,
+      "plain": "dwadzieścia jeden",
+      "text": "dwadzieścia jeden",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwadzieścia jeden",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "hundred-one",
+      "input": "101",
+      "verbalized": "sto jeden",
+      "speakable": true,
+      "plain": "sto jeden",
+      "text": "sto jeden",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "sto jeden",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "thousand",
+      "input": "1000",
+      "verbalized": "tysiąc",
+      "speakable": true,
+      "plain": "tysiąc",
+      "text": "tysiąc",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "tysiąc",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "two-thousand",
+      "input": "2000",
+      "verbalized": "dwa tysiące",
+      "speakable": true,
+      "plain": "dwa tysiące",
+      "text": "dwa tysiące",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwa tysiące",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "sentence",
+      "input": "Dzień dobry! Jak się masz?",
+      "verbalized": "Dzień dobry! Jak się masz?",
+      "speakable": true,
+      "plain": "Dzień dobry! Jak się masz?",
+      "text": "Dzień dobry! Jak się masz?",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Dzień dobry! Jak się masz?",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "emoji-inside",
+      "input": "emoji 😀 w środku",
+      "verbalized": "emoji 😀 w środku",
+      "speakable": true,
+      "plain": "emoji w środku",
+      "text": "emoji w środku",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "emoji w środku",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "emoji-run",
+      "input": "😀😀😀",
+      "verbalized": "😀😀😀",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 0,
+      "segments": [],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "pause-only",
+      "input": "⏸️",
+      "verbalized": "⏸️",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 400,
+      "segments": [],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        },
+        {
+          "kind": "pause",
+          "pauseMs": 400,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "turtle-only",
+      "input": "🐢",
+      "verbalized": "🐢",
+      "speakable": false,
+      "plain": "",
+      "text": "",
+      "leadingPauseMs": 0,
+      "segments": [],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "ampersand",
+      "input": "A & B",
+      "verbalized": "A i B",
+      "speakable": true,
+      "plain": "A i B",
+      "text": "A i B",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "A i B",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "mixed-money",
+      "input": "Cena 1 299,99 zł i 7 szt.",
+      "verbalized": "Cena tysiąc dwieście dziewięćdziesiąt dziewięć złotych dziewięćdziesiąt dziewięć groszy i siedem sztuk",
+      "speakable": true,
+      "plain": "Cena tysiąc dwieście dziewięćdziesiąt dziewięć złotych dziewięćdziesiąt dziewięć groszy i siedem sztuk",
+      "text": "Cena tysiąc dwieście dziewięćdziesiąt dziewięć złotych dziewięćdziesiąt dziewięć groszy i siedem sztuk",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Cena tysiąc dwieście dziewięćdziesiąt dziewięć złotych dziewięćdziesiąt dziewięć groszy i siedem sztuk",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "hour-exact",
+      "input": "Zadzwonił o 12:00.",
+      "verbalized": "Zadzwonił o dwunastej.",
+      "speakable": true,
+      "plain": "Zadzwonił o dwunastej.",
+      "text": "Zadzwonił o dwunastej.",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "Zadzwonił o dwunastej.",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "cells",
+      "input": "12 kg, 40 km, 3 cm i 5 mm",
+      "verbalized": "dwanaście kilogramów, czterdzieści kilometrów, trzy centymetrów i pięć milimetrów",
+      "speakable": true,
+      "plain": "dwanaście kilogramów, czterdzieści kilometrów, trzy centymetrów i pięć milimetrów",
+      "text": "dwanaście kilogramów, czterdzieści kilometrów, trzy centymetrów i pięć milimetrów",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dwanaście kilogramów, czterdzieści kilometrów, trzy centymetrów i pięć milimetrów",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "dr",
+      "input": "dr Nowak i mgr Kowalski",
+      "verbalized": "dr Nowak i mgr Kowalski",
+      "speakable": true,
+      "plain": "dr Nowak i mgr Kowalski",
+      "text": "dr Nowak i mgr Kowalski",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "dr Nowak i mgr Kowalski",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    },
+    {
+      "name": "speed-reset",
+      "input": "🐢🐢 tekst 🎙️",
+      "verbalized": "🐢🐢 tekst 🎙️",
+      "speakable": true,
+      "plain": "tekst",
+      "text": "tekst",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "tekst",
+          "speed": 0.72,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": [
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "slower",
+          "pauseMs": 0,
+          "dsp": ""
+        },
+        {
+          "kind": "reset",
+          "pauseMs": 0,
+          "dsp": ""
+        }
+      ]
+    },
+    {
+      "name": "braces",
+      "input": "wartość 0,5 oraz 2,25",
+      "verbalized": "wartość zero przecinek pięć oraz dwa przecinek dwadzieścia pięć",
+      "speakable": true,
+      "plain": "wartość zero przecinek pięć oraz dwa przecinek dwadzieścia pięć",
+      "text": "wartość zero przecinek pięć oraz dwa przecinek dwadzieścia pięć",
+      "leadingPauseMs": 0,
+      "segments": [
+        {
+          "text": "wartość zero przecinek pięć oraz dwa przecinek dwadzieścia pięć",
+          "speed": 1,
+          "dsp": "",
+          "pauseMs": 0
+        }
+      ],
+      "chapters": [],
+      "directives": []
+    }
+  ],
+  "palette": [
+    {
+      "token": "📖",
+      "kind": "chapter",
+      "pauseMs": 900,
+      "dsp": "",
+      "label": "Chapter start"
+    },
+    {
+      "token": "🛑",
+      "kind": "pause",
+      "pauseMs": 900,
+      "dsp": "",
+      "label": "900 ms pause"
+    },
+    {
+      "token": "⏸️",
+      "kind": "pause",
+      "pauseMs": 400,
+      "dsp": "",
+      "label": "400 ms pause"
+    },
+    {
+      "token": "😮‍💨",
+      "kind": "pause",
+      "pauseMs": 600,
+      "dsp": "",
+      "label": "600 ms pause"
+    },
+    {
+      "token": "🎙️",
+      "kind": "reset",
+      "pauseMs": 0,
+      "dsp": "",
+      "label": "Narrator (reset)"
+    },
+    {
+      "token": "🐢",
+      "kind": "slower",
+      "pauseMs": 0,
+      "dsp": "",
+      "label": "Slower"
+    },
+    {
+      "token": "🐇",
+      "kind": "faster",
+      "pauseMs": 0,
+      "dsp": "",
+      "label": "Faster"
+    },
+    {
+      "token": "📻",
+      "kind": "dsp",
+      "pauseMs": 0,
+      "dsp": "radio",
+      "label": "Radio"
+    },
+    {
+      "token": "📱",
+      "kind": "dsp",
+      "pauseMs": 0,
+      "dsp": "phone",
+      "label": "Phone"
+    },
+    {
+      "token": "🏛️",
+      "kind": "dsp",
+      "pauseMs": 0,
+      "dsp": "cathedral",
+      "label": "Cathedral"
+    },
+    {
+      "token": "🤫",
+      "kind": "dsp",
+      "pauseMs": 0,
+      "dsp": "whisper",
+      "label": "Whisper"
+    }
+  ]
+}

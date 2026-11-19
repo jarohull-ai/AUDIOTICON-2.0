@@ -1,0 +1,22 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="qml/Main.qml">qml/Main.qml</file>
+        <file alias="qml/TelemetryTile.qml">qml/TelemetryTile.qml</file>
+        <file alias="qml/StateStrip.qml">qml/StateStrip.qml</file>
+        <file alias="qml/AgentMain.qml">qml/AgentMain.qml</file>
+        <file alias="qml/ChatBubble.qml">qml/ChatBubble.qml</file>
+        <file alias="qml/NavRail.qml">qml/NavRail.qml</file>
+        <file alias="qml/StudioView.qml">qml/StudioView.qml</file>
+        <file alias="qml/ContextInspector.qml">qml/ContextInspector.qml</file>
+        <file alias="qml/MasteringStrip.qml">qml/MasteringStrip.qml</file>
+        <file alias="qml/WallpaperBackground.qml">qml/WallpaperBackground.qml</file>
+        <file alias="qml/WallpaperSettings.qml">qml/WallpaperSettings.qml</file>
+        <file alias="qml/DoctorView.qml">qml/DoctorView.qml</file>
+        <file alias="qml/ModelHubView.qml">qml/ModelHubView.qml</file>
+        <file alias="qml/ModelCard.qml">qml/ModelCard.qml</file>
+        <file alias="qml/FirstRunWizard.qml">qml/FirstRunWizard.qml</file>
+        <file alias="assets/wallpapers/pexels-artyusufpatel-8998289.jpg">../assets/wallpapers/pexels-artyusufpatel-8998289.jpg</file>
+        <file alias="i18n/en.json">i18n/en.json</file>
+        <file alias="i18n/pl.json">i18n/pl.json</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,170 @@
+diff --git i/agent-console.pro w/agent-console.pro
+index a9fbf95..26f50cf 100644
+--- i/agent-console.pro
++++ w/agent-console.pro
+@@ -1,10 +1,12 @@
+ # ASTRA UI template - agent console.
+-QT += core gui qml quick quickcontrols2
++QT += core gui qml quick quickcontrols2 multimedia sql network
+ CONFIG += c++17 release
+ TARGET = astra-agent-console
+ 
+ INCLUDEPATH += src src/agent
+ 
++include(src/core/core.pri)
++
+ SOURCES += \
+     src/agent/main.cpp \
+     src/agent/agentmodel.cpp \
+diff --git i/tests/tests.cpp w/tests/tests.cpp
+index f5f771f..d854f18 100644
+--- i/tests/tests.cpp
++++ w/tests/tests.cpp
+@@ -1,4 +1,5 @@
+ #include <QtTest>
++#include <QDir>
+ #include <QQmlApplicationEngine>
+ #include <QQmlContext>
+ #include <QQuickStyle>
+@@ -9,6 +10,13 @@
+ #include "agentmodel.h"
+ #include "dashboardmodel.h"
+ #include "translator.h"
++#include "voice/DirectiveParser.h"
++#include "voice/PolishVerbalizer.h"
++
++#include <QFile>
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
+ 
+ // A minimal model: two percentage metrics and one that is not a percentage,
+ // so both chart axes get exercised.
+@@ -165,6 +173,113 @@ private slots:
+     }
+ 
+ 
++    // ---- voice core (ported from the donor) -------------------------------
++
++    // The C++ port has to agree with Portable Local Studio word for word: the
++    // golden file is generated from the donor module by tests/generate-golden.cjs.
++    void directiveGolden() {
++        QFile file(QStringLiteral(":/golden/tts-golden.json"));
++        QVERIFY2(file.open(QIODevice::ReadOnly), "tests/data/tts-golden.json is missing from the resources");
++        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
++        QVERIFY(doc.isObject());
++        const QJsonArray cases = doc.object().value("cases").toArray();
++        QVERIFY2(cases.size() >= 40, "the golden set shrank");
++
++        for (const QJsonValue &value : cases) {
++            const QJsonObject c = value.toObject();
++            const QString name = c.value("name").toString();
++            const QString input = c.value("input").toString();
++            // QVERIFY2 keeps the pointer, so the text has to outlive the call.
++            static QByteArray messageBuffer;
++            const auto message = [&name](const QString &what, const QString &got, const QString &want) {
++                messageBuffer = QStringLiteral("%1 / %2: got [%3], want [%4]")
++                                    .arg(name, what, got, want).toUtf8();
++                return messageBuffer.constData();
++            };
++
++            QVERIFY2(audioticon::verbalizePolish(input) == c.value("verbalized").toString(),
++                     message("verbalizePolish", audioticon::verbalizePolish(input),
++                             c.value("verbalized").toString()));
++            QCOMPARE(audioticon::hasSpeakableText(input), c.value("speakable").toBool());
++            QVERIFY2(audioticon::preparePlainText(input) == c.value("plain").toString(),
++                     message("preparePlainText", audioticon::preparePlainText(input),
++                             c.value("plain").toString()));
++
++            const audioticon::DirectedText parsed = audioticon::parseDirectedText(input);
++            QVERIFY2(parsed.text == c.value("text").toString(),
++                     message("text", parsed.text, c.value("text").toString()));
++            QCOMPARE(parsed.leadingPauseMs, c.value("leadingPauseMs").toInt());
++
++            const QJsonArray segments = c.value("segments").toArray();
++            QVERIFY2(parsed.segments.size() == segments.size(),
++                     message("segment count", QString::number(parsed.segments.size()),
++                             QString::number(segments.size())));
++            for (int i = 0; i < segments.size(); ++i) {
++                const QJsonObject want = segments.at(i).toObject();
++                const audioticon::VoiceSegment got = parsed.segments.at(i);
++                QVERIFY2(got.text == want.value("text").toString(),
++                         message(QStringLiteral("segment %1 text").arg(i), got.text,
++                                 want.value("text").toString()));
++                QVERIFY2(qAbs(got.speed - want.value("speed").toDouble()) < 1e-9,
++                         message(QStringLiteral("segment %1 speed").arg(i), QString::number(got.speed),
++                                 QString::number(want.value("speed").toDouble())));
++                QVERIFY2(got.dsp == want.value("dsp").toString(),
++                         message(QStringLiteral("segment %1 dsp").arg(i), got.dsp,
++                                 want.value("dsp").toString()));
++                QVERIFY2(got.pauseMs == want.value("pauseMs").toInt(),
++                         message(QStringLiteral("segment %1 pause").arg(i),
++                                 QString::number(got.pauseMs),
++                                 QString::number(want.value("pauseMs").toInt())));
++            }
++
++            const QJsonArray chapters = c.value("chapters").toArray();
++            QVERIFY2(parsed.chapters.size() == chapters.size(),
++                     message("chapter count", QString::number(parsed.chapters.size()),
++                             QString::number(chapters.size())));
++            for (int i = 0; i < chapters.size(); ++i) {
++                const QJsonObject want = chapters.at(i).toObject();
++                QCOMPARE(parsed.chapters.at(i).index, want.value("index").toInt());
++                QVERIFY2(parsed.chapters.at(i).title == want.value("title").toString(),
++                         message(QStringLiteral("chapter %1 title").arg(i), parsed.chapters.at(i).title,
++                                 want.value("title").toString()));
++            }
++
++            const QJsonArray directives = c.value("directives").toArray();
++            QVERIFY2(parsed.directives.size() == directives.size(),
++                     message("directive count", QString::number(parsed.directives.size()),
++                             QString::number(directives.size())));
++            for (int i = 0; i < directives.size(); ++i) {
++                const QJsonObject want = directives.at(i).toObject();
++                const QVariantMap got = parsed.directives.at(i).toMap();
++                QVERIFY2(got.value("kind").toString() == want.value("kind").toString(),
++                         message(QStringLiteral("directive %1 kind").arg(i),
++                                 got.value("kind").toString(), want.value("kind").toString()));
++                QCOMPARE(got.value("pauseMs").toInt(), want.value("pauseMs").toInt());
++                QVERIFY2(got.value("dsp").toString() == want.value("dsp").toString(),
++                         message(QStringLiteral("directive %1 dsp").arg(i),
++                                 got.value("dsp").toString(), want.value("dsp").toString()));
++            }
++        }
++    }
++
++    // The palette comes from the grammar, so the UI never keeps a second copy of it.
++    void directivePaletteMatchesDonor() {
++        QFile file(QStringLiteral(":/golden/tts-golden.json"));
++        QVERIFY(file.open(QIODevice::ReadOnly));
++        const QJsonArray palette = QJsonDocument::fromJson(file.readAll()).object().value("palette").toArray();
++        const QVariantList described = audioticon::describeDirectives();
++        QCOMPARE(described.size(), palette.size());
++        for (int i = 0; i < palette.size(); ++i) {
++            const QJsonObject want = palette.at(i).toObject();
++            const QVariantMap got = described.at(i).toMap();
++            QCOMPARE(got.value("token").toString(), want.value("token").toString());
++            QCOMPARE(got.value("kind").toString(), want.value("kind").toString());
++            QCOMPARE(got.value("pauseMs").toInt(), want.value("pauseMs").toInt());
++            QCOMPARE(got.value("dsp").toString(), want.value("dsp").toString());
++            QCOMPARE(got.value("label").toString(), want.value("label").toString());
++        }
++    }
++
+     // ---- agent console ----------------------------------------------------
+ 
+     void agentTurnStreamsAndShowsTools() {
+diff --git i/tests/tests.pro w/tests/tests.pro
+index 35cd7ff..98882a0 100644
+--- i/tests/tests.pro
++++ w/tests/tests.pro
+@@ -4,6 +4,8 @@ TARGET = tests
+ 
+ INCLUDEPATH += ../src ../src/agent
+ 
++include(../src/core/core.pri)
++
+ SOURCES += tests.cpp ../src/dashboardmodel.cpp ../src/translator.cpp ../src/agent/agentmodel.cpp
+ HEADERS += ../src/dashboardmodel.h ../src/translator.h ../src/agent/agentmodel.h
+-RESOURCES += ../src/resources.qrc
++RESOURCES += ../src/resources.qrc golden.qrc

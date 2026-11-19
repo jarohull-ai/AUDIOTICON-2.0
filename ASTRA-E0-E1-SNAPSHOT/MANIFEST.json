@@ -1,0 +1,164 @@
+{
+  "snapshot_created_at": "2026-11-18T16:53:00Z",
+  "base_repo": "/home/jaro/.openclaw/workspace/ASTRA-UI-Template",
+  "source_repo": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7",
+  "snapshot_dir": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT",
+  "base_commit": "4252f4f (agent-ui)",
+  "files_count": 14,
+  "files": [
+    {
+      "path": "agent-console.pro",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/agent-console.pro",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/agent-console.pro",
+      "status": "MODIFIED",
+      "size_bytes": 400,
+      "sha256": "c08bcb684e523c55941a4a03aa22b918c1b4e3c3f4d4f44a67c2eac9084a1800",
+      "sha256_match_with_source": true,
+      "base_exists": true,
+      "base_sha256": "1d798e523651c874d0731f224132361980044b214c7a018c39ae702edc336cd8"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/docs/ARCHITECTURE.md",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/docs/ARCHITECTURE.md",
+      "status": "NEW",
+      "size_bytes": 3754,
+      "sha256": "17dc3c9ad3edbe8c7312a6e8d2f00ca5324d9d599eab21b69f3afa267ef63031",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/core.pri",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/core.pri",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/core.pri",
+      "status": "NEW",
+      "size_bytes": 313,
+      "sha256": "0dbe0bcbf1a5bcc9b2ad11e60e79b1ede05a80580c967bc7533bb0ef49ab52f4",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/Paths.h",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/Paths.h",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/Paths.h",
+      "status": "NEW",
+      "size_bytes": 618,
+      "sha256": "65c4311b6884e7cc859008456bb517ebd1b2caa40ed7bbb57eac33161814062c",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/Paths.cpp",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/Paths.cpp",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/Paths.cpp",
+      "status": "NEW",
+      "size_bytes": 877,
+      "sha256": "2a0536fbe34979eb1121aa4d79a953c1fe48368bdb2674f2f53aa626c1b58385",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/voice/PolishVerbalizer.h",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/voice/PolishVerbalizer.h",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/voice/PolishVerbalizer.h",
+      "status": "NEW",
+      "size_bytes": 522,
+      "sha256": "8cbf2f0afa7d94957fe622a9683a53cb7963f640a0211e3a19e15944ffb790d3",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/voice/PolishVerbalizer.cpp",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/voice/PolishVerbalizer.cpp",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/voice/PolishVerbalizer.cpp",
+      "status": "NEW",
+      "size_bytes": 20667,
+      "sha256": "6ae015e1c5eb57f140625207d54963f603be06d7c9b4e0fd267fb60bc067e1de",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/voice/DirectiveParser.h",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/voice/DirectiveParser.h",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/voice/DirectiveParser.h",
+      "status": "NEW",
+      "size_bytes": 1561,
+      "sha256": "423530030960b0f92e8fd505de01d52a511b5172a94767b53018f83cd465f5eb",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "src/core/voice/DirectiveParser.cpp",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/src/core/voice/DirectiveParser.cpp",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/src/core/voice/DirectiveParser.cpp",
+      "status": "NEW",
+      "size_bytes": 13644,
+      "sha256": "b22c0f671e32d9327b787f35c9db3d4c84ef8aa1b8055b679137c03fbdc1c878",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "tests/data/tts-golden.json",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/tests/data/tts-golden.json",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/tests/data/tts-golden.json",
+      "status": "NEW",
+      "size_bytes": 25865,
+      "sha256": "0f5f846d577d0c2f06ffee222727fb484357e7fbbadbcb2c374bdac96ee7fba4",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "tests/generate-golden.cjs",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/tests/generate-golden.cjs",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/tests/generate-golden.cjs",
+      "status": "NEW",
+      "size_bytes": 3703,
+      "sha256": "f311f00a481008cefe096e9cbfdedd21393f1c32f64f7f5e753d59a76b3804e6",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "tests/golden.qrc",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/tests/golden.qrc",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/tests/golden.qrc",
+      "status": "NEW",
+      "size_bytes": 129,
+      "sha256": "e8d53c3e151e0849badc679bb62d8d9569d1fd219a2f0541027e39e19493044a",
+      "sha256_match_with_source": true,
+      "base_exists": false,
+      "base_sha256": null
+    },
+    {
+      "path": "tests/tests.cpp",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/tests/tests.cpp",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/tests/tests.cpp",
+      "status": "MODIFIED",
+      "size_bytes": 16555,
+      "sha256": "0e2da3e530ea194bdf411b69ca0ca1bdf5d07ef3f8c8998ad7133c242bb70f52",
+      "sha256_match_with_source": true,
+      "base_exists": true,
+      "base_sha256": "43d05dcb16f3889ebbdc29015f17803c2fd026edd8ebc6430f9c98c7f405f2c3"
+    },
+    {
+      "path": "tests/tests.pro",
+      "source_path": "/home/jaro/.config/freebuff-desktop/local-projects/32b70bfb-05a3-46fe-bd12-5e50e0e0f4e7/tests/tests.pro",
+      "snapshot_path": "/home/jaro/.openclaw/workspace/AUDIOTICON 2.0/ASTRA-E0-E1-SNAPSHOT/tests/tests.pro",
+      "status": "MODIFIED",
+      "size_bytes": 379,
+      "sha256": "242e5c745a66196b9469b66947663bbed2da974405446d3935c92835abd1926f",
+      "sha256_match_with_source": true,
+      "base_exists": true,
+      "base_sha256": "68e198caa32f9bde39374ab8732ff56eff32d232ff5cdbdec4981710e03f5971"
+    }
+  ]
+}

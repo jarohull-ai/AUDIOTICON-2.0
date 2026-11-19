@@ -1,0 +1,13 @@
+target/
+dist/
+*.wav
+*.mp3
+!docs/audio/*.mp3
+!docs/samples/*.mp3
+*.m4b
+*.onnx
+*.onnx.json
+cache/
+models/
+.DS_Store
+/tests/
