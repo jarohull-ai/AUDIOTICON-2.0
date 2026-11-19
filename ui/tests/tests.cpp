@@ -80,6 +80,7 @@ private slots:
         QQuickStyle::setStyle("Material");
         qmlRegisterType<DoctorModel>("Audioticon.Doctor", 1, 0, "DoctorModel");
         qputenv("AUDIOTICON_MOCK_RENDER", "1");
+        qputenv("AUDIOTICON_OFFLINE_TEST", "1");
     }
 
     // M4: the Qt process calls into the real Rust core through the cxx glue and
@@ -847,6 +848,9 @@ private slots:
     void fallbackWithoutModelReportsMissingVoiceModel() {
         qunsetenv("AUDIOTICON_MOCK_RENDER");
         qunsetenv("AUDIOTICON_PIPER_MODEL");
+        ScopedEnv xdg("XDG_DATA_HOME");
+        QTemporaryDir emptyData;
+        qputenv("XDG_DATA_HOME", emptyData.path().toUtf8());
 
         StudioBridge studio;
         QTemporaryDir output;

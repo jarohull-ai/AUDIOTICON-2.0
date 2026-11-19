@@ -1212,8 +1212,18 @@ impl BridgeEngine {
             PathBuf::from(output_dir)
         };
 
-        let active_piper = self.piper_guard().clone();
-        if let Some(piper) = active_piper {
+        if self.mock_enabled {
+            // Explicit mock mode for tests exercising the progress pipeline
+            let (job_id, cancel) = self.jobs.register(planned_steps(text));
+            spawn_mock_render(
+                Arc::clone(&self.jobs),
+                job_id,
+                text.to_string(),
+                output_dir,
+                cancel,
+            );
+            Ok(job_id)
+        } else if let Some(piper) = self.piper_guard().clone() {
             // Real Piper path: full chapter render (many segments + cache + stitch).
             let segments = split_chapter_segments(text);
             let total = segments.len().max(1) as u32;
@@ -1225,17 +1235,6 @@ impl BridgeEngine {
                 output_dir,
                 cancel,
                 piper,
-            );
-            Ok(job_id)
-        } else if self.mock_enabled {
-            // Explicit mock mode for tests exercising the progress pipeline
-            let (job_id, cancel) = self.jobs.register(planned_steps(text));
-            spawn_mock_render(
-                Arc::clone(&self.jobs),
-                job_id,
-                text.to_string(),
-                output_dir,
-                cancel,
             );
             Ok(job_id)
         } else {
@@ -1277,8 +1276,74 @@ pub fn core_version() -> u32 {
     audioticon_core::DEFAULT_SAMPLE_RATE
 }
 
+/// Standard system transport using `curl` streaming stdout into the sink.
+/// Enables on-demand downloads requested explicitly by user in Model Hub.
+#[derive(Debug, Default)]
+pub struct SystemCurlTransport;
+
+impl audioticon_core::RemoteTransport for SystemCurlTransport {
+    fn fetch(
+        &self,
+        url: &str,
+        sink: &mut dyn FnMut(&[u8]) -> Result<(), audioticon_core::TransportError>,
+    ) -> Result<(), audioticon_core::TransportError> {
+        use std::io::Read;
+        let mut child = std::process::Command::new("curl")
+            .arg("-sSL")
+            .arg("--fail")
+            .arg("--connect-timeout")
+            .arg("15")
+            .arg(url)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| audioticon_core::TransportError::Network(format!("Nie można uruchomić curl: {e}")))?;
+
+        let mut stdout = child.stdout.take().ok_or_else(|| {
+            audioticon_core::TransportError::Network("Brak wyjścia stdout procesu curl".to_string())
+        })?;
+
+        let mut buffer = [0u8; 64 * 1024];
+        loop {
+            match stdout.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => {
+                    sink(&buffer[..n])?;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(audioticon_core::TransportError::Io(e.to_string())),
+            }
+        }
+
+        let status = child
+            .wait()
+            .map_err(|e| audioticon_core::TransportError::Network(format!("Błąd oczekiwania na curl: {e}")))?;
+
+        if !status.success() {
+            let code = status.code().unwrap_or(-1);
+            return Err(audioticon_core::TransportError::Network(format!(
+                "curl zakończył się błędem (kod {code})"
+            )));
+        }
+
+        Ok(())
+    }
+}
+
 pub fn create_engine() -> Result<Box<BridgeEngine>, BridgeError> {
-    Ok(Box::new(BridgeEngine::new()))
+    let offline = std::env::var("AUDIOTICON_OFFLINE_TEST")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if offline {
+        Ok(Box::new(BridgeEngine::new()))
+    } else {
+        let transport = Arc::new(SystemCurlTransport);
+        Ok(Box::new(BridgeEngine::from_catalog(
+            audioticon_core::ModelCatalog::for_current_user(),
+            false,
+            Some(transport),
+        )))
+    }
 }
 
 pub fn parse_directed_text(
