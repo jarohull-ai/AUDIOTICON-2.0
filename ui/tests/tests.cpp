@@ -76,6 +76,7 @@ private slots:
     void initTestCase() {
         QVERIFY(m_dir.isValid());
         QSettings::setPath(QSettings::NativeFormat, QSettings::UserScope, m_dir.path());
+        qputenv("XDG_DATA_HOME", m_dir.path().toUtf8());
         // Must happen before any QML engine imports Qt Quick Controls.
         QQuickStyle::setStyle("Material");
         qmlRegisterType<DoctorModel>("Audioticon.Doctor", 1, 0, "DoctorModel");
@@ -269,6 +270,8 @@ private slots:
         QVERIFY(!engine.rootObjects().isEmpty());
         auto window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(window);
+        window->show();
+        window->requestActivate();
         QTest::qWait(200);
         // The shell's own shortcuts: edit mode, pause.
         QTest::keyClick(window, Qt::Key_E);

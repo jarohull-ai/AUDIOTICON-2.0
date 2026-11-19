@@ -77,6 +77,7 @@ int main(int argc, char **argv) {
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
     QObject::connect(&translator, &Translator::changed, &doctor, &DoctorModel::refresh);
+    QObject::connect(&studio, &StudioBridge::modelSelectionChanged, &doctor, &DoctorModel::refresh);
     QObject::connect(&translator, &Translator::changed, &wallpaper, [&wallpaper] { wallpaper.scanAssets(); });
     engine.rootContext()->setContextProperty("feed", &feed);
     engine.rootContext()->setContextProperty("studio", &studio);

@@ -730,7 +730,11 @@ QVariantMap StudioBridge::parseDirectedText(const QString &rawText)
         // The Rust job only ever receives segments, never the directive text:
         // parsing and verbalization stay on this side (single source of truth).
         m_plainText = parsed.text;
+        m_statusMessage = QStringLiteral("Wyreżyserowano: %1 segmentów, %2 rozdziałów")
+                              .arg(segmentList.size())
+                              .arg(chapterList.size());
         emit segmentsChanged();
+        emit taskStatusChanged();
 
         QVariantMap result;
         result[QStringLiteral("plain_text")] = parsed.text;
@@ -845,11 +849,15 @@ void StudioBridge::pollJob()
         const bool success = (stage == QLatin1String("Finished"));
         emit renderFinished(success);
 
-        if (m_autoPlayOnFinish) {
-            m_autoPlayOnFinish = false;
-            if (success && !m_outputPath.isEmpty()) {
+        if (success && !m_outputPath.isEmpty()) {
+            if (m_player)
+                m_player->load(m_outputPath);
+            if (m_autoPlayOnFinish) {
+                m_autoPlayOnFinish = false;
                 playOutput();
             }
+        } else {
+            m_autoPlayOnFinish = false;
         }
     }
 }

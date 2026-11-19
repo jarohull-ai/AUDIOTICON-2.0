@@ -24,6 +24,10 @@ Item {
     signal segmentSelected(var segment, int index)
     signal inspectRequested()
 
+    Component.onCompleted: {
+        parseTimer.restart();
+    }
+
     FileDialog {
         id: studioFileDialog
         title: qsTr("Select Piper voice model (.onnx)")
