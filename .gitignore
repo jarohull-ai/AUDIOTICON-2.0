@@ -33,4 +33,4 @@ release/
 .idea/
 
 # Large generated/demo audio samples
-backend/docs/samples/*.mp3
+backend/docs/samples/
